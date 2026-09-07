@@ -15,8 +15,9 @@ load_dotenv(ROOT / ".env")
 
 import streamlit as st
 
-from src.config import ASSETS_DIR, SOURCES, VOICES
-from src.pipeline import run_briefing
+from src.config import ASSETS_DIR, DEFAULT_READER, READERS, SOURCES
+from src.pipeline import reader_voice, run_briefing
+from src.podcast import synthesize
 
 _page = {
     "page_title": "Briefing DATA-LAB | Javeriana Cali",
@@ -87,6 +88,8 @@ def render_item(idx: int, item) -> None:
 def main() -> None:
     load_css()
     hero()
+    if "briefing" not in st.session_state:
+        st.session_state.briefing = None
 
     with st.sidebar:
         st.header("Edición")
@@ -105,19 +108,44 @@ def main() -> None:
                     chosen.append(source.id)
                 st.caption(source.home)
 
-        voice = st.selectbox(
-            "Voz del noticiero",
-            options=list(VOICES),
-            format_func=lambda key: VOICES[key],
+        st.subheader("Quién lee las noticias")
+        reader_keys = list(READERS)
+        reader_choice = st.radio(
+            "Locutor o locutora del podcast",
+            options=reader_keys,
+            index=reader_keys.index(DEFAULT_READER),
+            format_func=lambda key: READERS[key]["label"],
+            horizontal=True,
+            help="Ambas voces son colombianas y mantienen el tono de noticiero en español.",
         )
+        reader_key = reader_choice
+        reader_info = READERS[reader_key]
+        st.caption(f"Voz: {reader_info['name']} · {reader_info['accent']}")
         use_llm = st.toggle("Mejorar redacción con API (Groq u OpenAI)", value=False)
         use_cache = st.toggle("Usar caché de 25 minutos", value=True)
         make_audio = st.toggle("Generar podcast en español", value=True)
         st.caption("Opcional: cree un archivo .env con GROQ_API_KEY u OPENAI_API_KEY.")
         run = st.button("Generar briefing del día", type="primary", use_container_width=True)
+        rerender = st.button(
+            "Volver a narrar con esta voz",
+            use_container_width=True,
+            disabled=st.session_state.get("briefing") is None,
+            help="Repite el audio del briefing actual, sin volver a consultar las fuentes.",
+        )
 
-    if "briefing" not in st.session_state:
-        st.session_state.briefing = None
+    if rerender and st.session_state.briefing:
+        briefing = st.session_state.briefing
+        voice, reader_label, reader_key = reader_voice(reader_key)
+        with st.status(f"Narrando de nuevo con voz de {reader_label.lower()}…", expanded=True) as status:
+            try:
+                briefing.audio_path = str(synthesize(briefing.script, voice=voice))
+                briefing.reader_key = reader_key
+                briefing.reader_label = reader_label
+                st.session_state.briefing = briefing
+                status.update(label=f"Audio listo · {reader_label}", state="complete")
+            except Exception as exc:
+                status.update(label="No se pudo generar el audio", state="error")
+                st.error(f"Error al narrar: {exc}")
 
     if run:
         if not chosen:
@@ -129,7 +157,7 @@ def main() -> None:
         try:
             briefing = run_briefing(
                 source_ids=chosen or default_ids,
-                voice=voice,
+                reader_key=reader_key,
                 use_llm=use_llm,
                 use_cache=use_cache,
                 make_audio=make_audio,
@@ -171,6 +199,7 @@ def main() -> None:
             unsafe_allow_html=True,
         )
         st.subheader("Podcast")
+        st.caption(f"Lo lee: {briefing.reader_label}")
         if briefing.audio_path and Path(briefing.audio_path).exists():
             audio_bytes = Path(briefing.audio_path).read_bytes()
             st.audio(audio_bytes, format="audio/mp3")
