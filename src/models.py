@@ -32,3 +32,4 @@ class Briefing:
     candidates: int = 0
     reader_key: str = "hombre"
     reader_label: str = "Hombre"
+    audio_note: str = ""

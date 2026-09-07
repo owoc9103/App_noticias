@@ -9,7 +9,11 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv(*_args, **_kwargs):
+        return False
 
 load_dotenv(ROOT / ".env")
 
@@ -138,9 +142,14 @@ def main() -> None:
         voice, reader_label, reader_key = reader_voice(reader_key)
         with st.status(f"Narrando de nuevo con voz de {reader_label.lower()}…", expanded=True) as status:
             try:
-                briefing.audio_path = str(synthesize(briefing.script, voice=voice))
+                briefing.audio_path = str(synthesize(briefing.script, voice=voice, reader_key=reader_key))
                 briefing.reader_key = reader_key
                 briefing.reader_label = reader_label
+                briefing.audio_note = (
+                    "Se usó la voz local de Windows porque el servicio en la nube no estuvo disponible."
+                    if briefing.audio_path.endswith(".wav")
+                    else ""
+                )
                 st.session_state.briefing = briefing
                 status.update(label=f"Audio listo · {reader_label}", state="complete")
             except Exception as exc:
@@ -200,18 +209,22 @@ def main() -> None:
         )
         st.subheader("Podcast")
         st.caption(f"Lo lee: {briefing.reader_label}")
+        if briefing.audio_note:
+            st.warning(briefing.audio_note)
         if briefing.audio_path and Path(briefing.audio_path).exists():
             audio_bytes = Path(briefing.audio_path).read_bytes()
-            st.audio(audio_bytes, format="audio/mp3")
+            suffix = Path(briefing.audio_path).suffix.lower()
+            mime = "audio/wav" if suffix == ".wav" else "audio/mp3"
+            st.audio(audio_bytes, format=mime)
             st.download_button(
-                "Descargar MP3",
+                "Descargar audio",
                 data=audio_bytes,
                 file_name=Path(briefing.audio_path).name,
-                mime="audio/mpeg",
+                mime=mime,
                 use_container_width=True,
             )
         else:
-            st.caption("El audio no se generó en esta corrida.")
+            st.caption("El audio no se generó en esta corrida. Puede reintentar con «Volver a narrar con esta voz».")
         with st.expander("Guion del noticiero"):
             st.write(briefing.script)
         st.markdown('<p class="jl-signoff">Esto te lo dice la app de javeriana Cali</p>', unsafe_allow_html=True)

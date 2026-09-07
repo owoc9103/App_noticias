@@ -65,9 +65,18 @@ def run_briefing(
         chosen_voice = voice
 
     audio_path = ""
+    audio_note = ""
     if make_audio:
         note(f"Generando el podcast en español con voz de {reader_label.lower()}…")
-        audio_path = str(synthesize(script, voice=chosen_voice))
+        try:
+            audio_path = str(synthesize(script, voice=chosen_voice, reader_key=reader_key))
+            if audio_path.endswith(".wav"):
+                audio_note = "Se usó la voz local de Windows porque el servicio en la nube no estuvo disponible."
+            elif "edge" not in audio_path:
+                audio_note = ""
+        except Exception as exc:
+            audio_note = f"El briefing se armó, pero el audio no se pudo generar: {exc}"
+            note(audio_note)
 
     note("Briefing listo.")
     return Briefing(
@@ -81,6 +90,7 @@ def run_briefing(
         candidates=len(candidates),
         reader_key=reader_key,
         reader_label=reader_label,
+        audio_note=audio_note,
     )
 
 
