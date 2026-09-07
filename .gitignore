@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/cache/
+data/audio/
+*.mp3
+_probe_feeds.py
+.streamlit/secrets.toml
