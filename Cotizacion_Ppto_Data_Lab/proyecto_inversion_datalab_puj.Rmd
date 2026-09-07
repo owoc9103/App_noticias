@@ -1,0 +1,178 @@
+---
+title: "Proyecto de Inversión – Datalab"
+author: "Laboratorio Analítica"
+date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+output:
+  word_document:
+    toc: true
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+subtitle: Facultad de Ciencias Económicas y Administrativas — Pontificia Universidad
+  Javeriana Cali
+lang: es
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+**Espacio disponible:** 7.20 m de largo × 4.30 m de ancho = 30.96 m²  
+**Capacidad:** 7 puestos de trabajo (6 estándar + 1 avanzado)  
+**Usos principales:** Visualización de datos, inteligencia artificial, docencia, investigación aplicada.
+
+---
+
+## ¿Qué es el Datalab?
+
+Entorno integral que reúne herramientas para extracción, transformación y organización de datos, facilitando modelos analíticos orientados a la toma de decisiones. Promueve el análisis mediante guías docentes, casos prácticos y bases de datos, apoyando investigación y docencia.
+
+## Objetivos del laboratorio
+
+1. Promover el uso de herramientas de analítica y visualización accesibles, eficientes y colaborativas.
+2. Servir como punto de apoyo para cursos, proyectos de investigación y actividades formativas que requieran análisis cuantitativo.
+3. Desarrollar en los estudiantes la capacidad de transformar datos en conocimiento útil.
+4. Facilitar el intercambio de experiencias, proyectos y materiales entre docentes, estudiantes y aliados externos.
+
+## Filosofía técnica aplicada
+
+| Objetivo | Decisión de inversión |
+|----------|------------------------|
+| Herramientas accesibles, eficientes, colaborativas | Equipos costo-eficientes; plataformas colaborativas (JupyterHub) |
+| Apoyo a cursos e investigación | Capacidad para correr modelos en aula |
+| Transformar datos en conocimiento útil | Suficiente RAM y GPU para datasets reales |
+| Intercambio con aliados externos | Espacio flexible, red segura para invitados |
+| Código abierto | Hardware que corre bien Linux + Python/R |
+
+## Distribución del espacio (30.96 m²)
+
+- **6 puestos estándar:** 1.20 m ancho × 0.80 m fondo cada uno
+- **1 puesto avanzado:** 1.50 m × 0.90 m
+- **Área rack/UPS:** 1.00 × 0.80 m
+- **Pantalla colaborativa:** 65" o 75" en pared frontal
+- **Pasillos centrales:** mínimo 1.20 m
+
+## Especificaciones de equipos
+
+### Puestos estándar (6 unidades)
+
+- CPU: AMD Ryzen 7 8700G o Intel i7-14700
+- RAM: 32 GB DDR5
+- GPU: NVIDIA RTX 4060 (8 GB VRAM)
+- Almacenamiento: 1 TB NVMe SSD
+- SO: Ubuntu 24.04 LTS + Windows 11 dual boot
+
+### Puesto avanzado (1 unidad)
+
+- CPU: AMD Ryzen 9 7950X o Intel i9-14900K
+- RAM: 64 GB DDR5
+- GPU: NVIDIA RTX 4070 Ti SUPER (16 GB VRAM) o RTX 4080
+- Almacenamiento: 2 TB NVMe SSD
+- SO: Ubuntu 24.04 LTS (principal)
+
+### Servidor liviano opcional
+
+- Mini PC con 64 GB RAM y 2 TB SSD para JupyterHub centralizado.
+
+## Infraestructura necesaria
+
+- **UPS:** 6 kVA línea interactiva
+- **Aire acondicionado:** Minisplit Inverter 24,000 BTU
+- **Switch de red:** Gigabit 16 puertos (opcional 2.5G para puesto avanzado)
+- **Cableado estructurado:** Cat6a a cada puesto
+- **Eléctrica:** 2 circuitos dedicados de 20A con toma a tierra
+
+## Mobiliario
+
+- 7 sillas ergonómicas
+- 7 mesas (estándar y una más grande para puesto avanzado)
+- Pantalla colaborativa 65" 4K
+- Pizarra blanca o digital
+
+## Software (enfoque código abierto)
+
+- SO: Ubuntu 24.04 LTS (gratuito)
+- Visualización: Tableau Public, Power BI Desktop, Metabase, Apache Superset (gratuitos)
+- IA/ML: Python, JupyterLab, TensorFlow, PyTorch, Scikit-learn (gratuitos)
+- Colaboración: VS Code Live Share, JupyterHub (gratuito)
+- Gestión de aula: Epoptes o Veyon (gratuitos)
+- Bases de datos: PostgreSQL, SQLite, DuckDB (gratuitos)
+- **Costo anual opcional:** $500 USD (licencia educativa para profesor)
+
+## Presupuesto total (USD)
+
+```{r presupuesto}
+presupuesto <- data.frame(
+  Partida = c(
+    "6 PCs estándar",
+    "1 PC avanzado",
+    "Servidor central opcional",
+    "Mobiliario (mesas+sillas)",
+    "Pantalla colaborativa",
+    "Rack + UPS + AC",
+    "Cableado + eléctrico",
+    "Software (año 1)",
+    "TOTAL",
+    "Con servidor liviano"
+  ),
+  `Costo bajo` = c(7200, 2800, 0, 2300, 800, 3200, 1300, 0, 17600, 20100),
+  `Costo alto` = c(9000, 4000, 2500, 3000, 1200, 4000, 1800, 500, 26000, 28500),
+  check.names = FALSE
+)
+
+formatear_usd <- function(x) {
+  paste0("$", format(x, big.mark = ",", scientific = FALSE))
+}
+
+presupuesto_fmt <- presupuesto
+presupuesto_fmt$`Costo bajo` <- formatear_usd(presupuesto$`Costo bajo`)
+presupuesto_fmt$`Costo alto` <- formatear_usd(presupuesto$`Costo alto`)
+
+knitr::kable(
+  presupuesto_fmt,
+  caption = "Presupuesto estimado del proyecto Datalab",
+  align = c("l", "r", "r")
+)
+```
+
+**Rango recomendado para presentar:** $22,000 – $25,000 USD
+
+## Plan de implementación (6 meses)
+
+- **Mes 1:** Adecuación eléctrica + AC + cableado
+- **Mes 2:** Compra de mobiliario y pantalla
+- **Mes 3:** Compra de equipos estándar
+- **Mes 4:** Compra de PC avanzado + servidor
+- **Mes 5:** Instalación de software y configuración
+- **Mes 6:** Capacitación docente y prueba piloto
+- **Mes 7:** Inauguración oficial
+
+## Justificación para la universidad
+
+- Alineación directa con los 4 objetivos del laboratorio.
+- Costo por puesto: ~$3,200 USD amortizable en 4-5 años.
+- Ventaja competitiva: pocas facultades de económicas en Colombia tienen GPUs para IA.
+- Bajo costo operativo anual (~$1,000 USD en electricidad y mantenimiento).
+
+## Indicadores de éxito (metas anuales)
+
+- Cursos usando el Datalab: ≥ 6
+- Estudiantes capacitados: ≥ 150
+- Proyectos de investigación: ≥ 3
+- Horas de uso por semana: ≥ 30
+- Satisfacción (encuesta): ≥ 4.5/5
+- Alianzas externas activas: ≥ 2
+
+## Resumen ejecutivo
+
+> **Proyecto Datalab – Inversión solicitada:** $25,000 USD (~$100 millones COP)  
+> **Espacio:** 30.96 m², 7 puestos  
+> **Usos:** Visualización, IA, docencia, investigación  
+> **Ventajas:** Software libre, bajo costo operativo, diferenciación institucional

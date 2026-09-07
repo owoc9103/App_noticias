@@ -1,0 +1,171 @@
+---
+title: "Pitch RFM Analítica"
+author: "DATA-LAB · Pontificia Universidad Javeriana Cali"
+date: "`r format(Sys.Date(), '%Y')`"
+output:
+  xaringan::moonshot:
+    css: ["default", "javeriana-xaringan.css"]
+    self_contained: true
+    lib_dir: libs
+    seal: false
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      ratio: "16:9"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(htmltools.dir.version = FALSE)
+```
+
+class: deck-slide
+
+# ¿Todos los clientes son iguales?
+
+<div class="deck-tag">Slide 1 · El problema</div>
+
+- Una empresa de **apuestas, recargas y giros** tiene miles de clientes que realizan transacciones todos los días.
+- Sin embargo, tratarlos **a todos de la misma manera** genera campañas poco efectivas y un **desperdicio de recursos**.
+
+<div class="deck-callout">
+<strong>Mensaje clave:</strong> La pregunta no es <em>quién compra</em>, sino <strong>cómo compra cada cliente</strong>.
+</div>
+
+---
+
+class: deck-slide
+
+# La solución: Modelo RFM
+
+<div class="deck-tag">Slide 2 · La solución</div>
+
+Con **tres variables** podemos entender el comportamiento de un cliente:
+
+<div class="deck-cards">
+  <div class="deck-card deck-card-r">
+    <strong>Recencia</strong>
+    <span class="rfm-letter r">R</span> ¿Hace cuánto fue su <strong>última compra</strong>?
+  </div>
+  <div class="deck-card deck-card-f">
+    <strong>Frecuencia</strong>
+    <span class="rfm-letter f">F</span> ¿Con qué <strong>frecuencia</strong> compra?
+  </div>
+  <div class="deck-card deck-card-m">
+    <strong>Valor monetario</strong>
+    <span class="rfm-letter m">M</span> ¿Cuánto <strong>dinero</strong> gasta?
+  </div>
+</div>
+
+<div class="deck-columns">
+  <div>
+    <strong>Pesos del modelo en este proyecto</strong>
+    <div class="weight-bar">
+      <div class="weight-row">
+        <span class="weight-label">Monetario</span>
+        <div class="weight-track"><div class="weight-fill m"></div></div>
+        <span class="weight-pct">60%</span>
+      </div>
+      <div class="weight-row">
+        <span class="weight-label">Frecuencia</span>
+        <div class="weight-track"><div class="weight-fill f"></div></div>
+        <span class="weight-pct">30%</span>
+      </div>
+      <div class="weight-row">
+        <span class="weight-label">Recencia</span>
+        <div class="weight-track"><div class="weight-fill r"></div></div>
+        <span class="weight-pct">10%</span>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="rfm-scheme">
+      <div class="rfm-node"><strong>R</strong>Recencia</div>
+      <div class="rfm-arrow">→</div>
+      <div class="rfm-node"><strong>F</strong>Frecuencia</div>
+      <div class="rfm-arrow">→</div>
+      <div class="rfm-node"><strong>M</strong>Monetario</div>
+      <div class="rfm-arrow">→</div>
+      <div class="rfm-node rfm-result"><strong>Score</strong>Segmento</div>
+    </div>
+    <p>El componente monetario tiene mayor peso porque el objetivo es identificar clientes de <strong>mayor valor económico</strong>.</p>
+  </div>
+</div>
+
+---
+
+class: deck-slide
+
+# ¿Qué obtuvimos?
+
+<div class="deck-tag">Slide 3 · Resultados</div>
+
+Una vez calculados los indicadores, cada cliente recibe un **puntaje** y se clasifica en segmentos:
+
+<div class="deck-segments">
+  <div class="seg seg-d">💎 Diamante</div>
+  <div class="seg seg-o">🥇 Oro</div>
+  <div class="seg seg-p">🥈 Plata</div>
+  <div class="seg seg-b">🥉 Bronce</div>
+</div>
+
+**Perfiles identificados adicionalmente:**
+
+<ul class="deck-profiles">
+  <li>⭐ Clientes estrella</li>
+  <li>🤝 Clientes leales</li>
+  <li>⚠️ Clientes en riesgo</li>
+  <li>😴 Clientes dormidos</li>
+</ul>
+
+<div class="deck-callout">
+<strong>Mensaje clave:</strong> Dejamos de ver <strong>miles de registros</strong> y empezamos a ver <strong>grupos con comportamientos claramente diferenciados</strong>.
+</div>
+
+---
+
+class: deck-slide
+
+# ¿Para qué sirve?
+
+<div class="deck-tag">Slide 4 · Aplicación</div>
+
+En lugar de enviar la **misma campaña para todos**, la empresa puede tomar **decisiones diferentes**:
+
+<div class="deck-table">
+<table>
+  <thead>
+    <tr><th>Segmento</th><th>Acción estratégica</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>💎 <strong>Diamante</strong></td><td>Fidelizar</td></tr>
+    <tr><td>🥇 <strong>Oro</strong></td><td>Incrementar gasto</td></tr>
+    <tr><td>🥈 <strong>Plata</strong></td><td>Incentivar frecuencia</td></tr>
+    <tr><td>🥉 <strong>Bronce</strong></td><td>Reactivar o recuperar</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="deck-callout">
+<strong>La analítica permite pasar de campañas masivas a estrategias personalizadas.</strong>
+</div>
+
+---
+
+class: deck-slide, deck-slide-accent
+
+# El impacto
+
+<div class="deck-tag">Slide 5 · Cierre</div>
+
+<div class="deck-quote">
+No vendas el modelo. <strong>Vende la decisión.</strong>
+</div>
+
+- El verdadero valor del modelo RFM no está en calcular tres indicadores.
+- Está en **transformar millones de transacciones** en decisiones comerciales más inteligentes.
+- Gracias a esta segmentación, la empresa puede **invertir mejor sus recursos**, fortalecer la relación con sus mejores clientes y diseñar **estrategias específicas** para cada perfil de consumidor.
+
+<div class="deck-tagline">
+Los datos nos dicen qué pasó. La analítica nos ayuda a decidir qué hacer después.
+</div>

@@ -1,0 +1,7 @@
+   unit_price       quantity         total          gross_income         rating      
+ Min.   :10.08   Min.   : 1.00   Min.   :  10.68   Min.   : 0.5085   Min.   : 4.000  
+ 1st Qu.:32.88   1st Qu.: 3.00   1st Qu.: 124.42   1st Qu.: 5.9249   1st Qu.: 5.500  
+ Median :55.23   Median : 5.00   Median : 253.85   Median :12.0880   Median : 7.000  
+ Mean   :55.67   Mean   : 5.51   Mean   : 322.97   Mean   :15.3794   Mean   : 6.973  
+ 3rd Qu.:77.94   3rd Qu.: 8.00   3rd Qu.: 471.35   3rd Qu.:22.4453   3rd Qu.: 8.500  
+ Max.   :99.96   Max.   :10.00   Max.   :1042.65   Max.   :49.6500   Max.   :10.000  

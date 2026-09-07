@@ -1,0 +1,166 @@
+import streamlit as st
+from streamlit_option_menu import option_menu
+
+# --- Configuración de la página ---
+import streamlit as st
+
+
+st.set_page_config(
+    page_title="Laboratorio Analítica",
+    page_icon="images_app/logo_jave_cali.png",  # Ruta a tu logo local
+    layout="wide"
+)
+
+from streamlit_option_menu import option_menu
+
+# --- Estilos personalizados (CSS) ---
+st.markdown("""
+    <style>
+    /* Barra superior */
+    .navbar {
+        background-color: #003366;
+        padding: 10px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: white;
+        font-family: Arial, sans-serif;
+    }
+    .navbar img {
+        height: 50px;
+        margin-right: 15px;
+    }
+    .navbar .menu a {
+        color: white;
+        margin: 0 10px;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    .navbar .menu a:hover {
+        color: #FFD100; /* Amarillo institucional */
+    }
+
+    /* Hero section */
+    .hero {
+        background-image: url("https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Javeriana_Cali.jpg/1200px-Javeriana_Cali.jpg");
+        background-size: cover;
+        background-position: center;
+        color: white;
+        height: 450px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+    .hero h1 {
+        font-size: 48px;
+        font-weight: bold;
+        text-shadow: 2px 2px 5px black;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- Navbar ---
+st.markdown("""
+    <div class="navbar">
+        <div style="display:flex; align-items:center;">
+            <img src="images_app/logo_jave_cali.png">
+            <span><b>Laboratorio de Analítica</b></span>
+        </div>
+        <div class="menu">
+            <a href="#inicio">Inicio</a>
+            <a href="#quienes-somos">Quiénes somos</a>
+            <a href="#consultoria">Docencia</a>
+            <a href="#consultoria">Consultoría</a>
+            <a href="#investigacion">Investigación</a>
+            <a href="#visualizaciones">Visualizaciones y datos</a>
+            <a href="#servicios">Servicios</a>
+            <a href="#servicios">Contacto</a>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+import streamlit as st
+
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Laboratorio de Analítica", page_icon="📊", layout="wide")
+
+# --- CSS + HTML para NAVBAR ---
+st.markdown("""
+    <style>
+    .navbar {
+        background-color: #003366;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        padding: 10px;
+    }
+    .navbar img {
+        height: 40px;
+        margin-right: 15px;
+    }
+    .navbar a {
+        float: left;
+        display: block;
+        color: white;
+        text-align: center;
+        padding: 14px 20px;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    .navbar a:hover {
+        background-color: #0059b3;
+        border-radius: 5px;
+    }
+    </style>
+    <div class="navbar">
+        <img src="images_app/logo_jave_cali.png">
+        <a href="#inicio">Inicio</a>
+        <a href="#quienes">Quiénes somos</a>
+        <a href="#docencia">Docencia</a>
+        <a href="#consultoria">Consultoría</a>
+        <a href="#investigacion">Investigación</a>
+        <a href="#visualizaciones">Visualizaciones y datos</a>
+        <a href="#servicios">Servicios</a>
+        <a href="#contacto">Contacto</a>
+    </div>
+""", unsafe_allow_html=True)
+
+# --- SECCIONES ---
+st.markdown("<h2 id='inicio'>🏠 Inicio</h2>", unsafe_allow_html=True)
+st.write("Bienvenido al Laboratorio de Analítica.")
+
+st.markdown("<h2 id='quienes'>👥 Quiénes somos</h2>", unsafe_allow_html=True)
+st.write("Aquí va la descripción de quiénes somos.")
+
+st.markdown("<h2 id='docencia'>📘 Docencia</h2>", unsafe_allow_html=True)
+st.write("Información sobre docencia.")
+
+st.markdown("<h2 id='consultoria'>💼 Consultoría</h2>", unsafe_allow_html=True)
+st.write("Información sobre consultoría.")
+
+st.markdown("<h2 id='investigacion'>🔬 Investigación</h2>", unsafe_allow_html=True)
+st.write("Información sobre investigación.")
+
+st.markdown("<h2 id='visualizaciones'>📊 Visualizaciones y datos</h2>", unsafe_allow_html=True)
+st.write("Dashboards y análisis.")
+
+st.markdown("<h2 id='servicios'>🛠️ Servicios</h2>", unsafe_allow_html=True)
+st.write("Nuestros servicios.")
+
+st.markdown("<h2 id='contacto'>📩 Contacto</h2>", unsafe_allow_html=True)
+st.write("Información de contacto.")
+
+
+
+# --- Hero section ---
+st.markdown("""
+    <div class="hero">
+        <h1>Laboratorio Analítica</h1>
+    </div>
+""", unsafe_allow_html=True)
+
+# --- Contenido de ejemplo ---
+st.write("## Bienvenidos")
+st.write("Aquí va el contenido de cada sección...")
+

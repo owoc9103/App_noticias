@@ -1,0 +1,178 @@
+---
+description: Crear presentaciones ejecutivas estilo TED, visuales, narrativas y minimalistas
+alwaysApply: true
+------------------
+
+# Regla: Presentación estilo TED
+
+Cuando se solicite crear una presentación, diseña una experiencia visual y narrativa de alto impacto, inspirada en una charla TED. La presentación no debe parecer un informe, una clase tradicional ni un documento lleno de texto.
+
+## Objetivo
+
+Construir una presentación clara, memorable y emocional, en la que cada diapositiva comunique una sola idea y apoye al presentador sin sustituir su discurso.
+
+## Principios narrativos
+
+1. Iniciar con una pregunta, problema, contradicción, dato sorprendente o situación reconocible para la audiencia.
+2. Presentar una tensión clara: qué problema existe y por qué importa.
+3. Introducir la solución como una respuesta natural al problema.
+4. Mostrar un ejemplo concreto o una demostración.
+5. Explicar el impacto de la solución.
+6. Terminar con una invitación, una visión de futuro o una frase memorable.
+7. Mantener una progresión narrativa: problema, descubrimiento, solución, evidencia, impacto e invitación.
+
+## Diseño de las diapositivas
+
+* Usar una sola idea principal por diapositiva.
+* Evitar párrafos.
+* Utilizar entre 3 y 12 palabras visibles por diapositiva, salvo cuando sea estrictamente necesario.
+* Priorizar fotografías, diagramas simples, cifras grandes, palabras clave y espacios en blanco.
+* No utilizar listas extensas.
+* No incluir más de tres elementos visuales principales por diapositiva.
+* Mantener una jerarquía visual clara.
+* Usar títulos grandes y legibles.
+* Evitar decoraciones innecesarias, bordes, sombras excesivas y elementos genéricos de PowerPoint.
+* No usar imágenes de baja calidad, clipart ni fotografías corporativas artificiales.
+* Mantener consistencia en tipografías, tamaños, alineación y composición.
+
+## Estilo visual
+
+Usar un estilo moderno, elegante y minimalista.
+
+Paleta recomendada:
+
+* Fondo principal: azul oscuro, negro suave o blanco.
+* Color de énfasis: azul institucional, turquesa o un color definido por el proyecto.
+* Texto principal: blanco sobre fondos oscuros o gris muy oscuro sobre fondos claros.
+* Usar un solo color de énfasis por diapositiva.
+
+Tipografía:
+
+* Preferir fuentes sans serif modernas.
+* Utilizar títulos entre 30 y 44 puntos.
+* Utilizar textos secundarios entre 18 y 26 puntos.
+* Nunca reducir demasiado el tamaño del texto para hacer que el contenido quepa.
+
+## Uso de imágenes
+
+* Cada imagen debe reforzar directamente la idea de la diapositiva.
+* Preferir imágenes conceptuales, humanas o relacionadas con el problema presentado.
+* Usar imágenes a pantalla completa cuando sea apropiado.
+* Aplicar superposiciones oscuras cuando se coloque texto sobre fotografías.
+* No insertar imágenes únicamente como decoración.
+* Si no hay una imagen adecuada, usar una composición tipográfica fuerte o un diagrama sencillo.
+
+## Gráficos y datos
+
+* Mostrar únicamente los datos necesarios para sostener el mensaje.
+* Resaltar una cifra o conclusión principal.
+* Eliminar cuadrículas, leyendas y etiquetas innecesarias.
+* Evitar tablas grandes.
+* Convertir datos complejos en comparaciones visuales simples.
+* Explicar siempre qué decisión permite tomar el análisis.
+
+## Animaciones
+
+* Utilizar animaciones con moderación.
+* Preferir apariciones, desvanecimientos y transiciones suaves.
+* Evitar giros, rebotes, sonidos y movimientos distractores.
+* Revelar información progresivamente cuando ayude a contar la historia.
+* Las animaciones nunca deben competir con el presentador.
+
+## Notas del presentador
+
+Para cada diapositiva, incluir:
+
+* Objetivo de la diapositiva.
+* Texto guía de lo que debe decir el presentador.
+* Una transición natural hacia la siguiente diapositiva.
+* Pausas o énfasis importantes.
+* Tiempo estimado.
+* Indicación de cuándo mirar al público y cuándo señalar la pantalla.
+
+El texto del presentador debe sonar natural, conversacional y seguro. No debe parecer leído ni utilizar lenguaje excesivamente técnico.
+
+## Duración
+
+Cuando el usuario indique una duración total:
+
+* Distribuir el tiempo entre las diapositivas.
+* Reservar más tiempo para el ejemplo, demostración o idea central.
+* Evitar superar aproximadamente una diapositiva por minuto, salvo que algunas sean únicamente visuales.
+* Para una presentación de cinco minutos, utilizar entre cinco y siete diapositivas.
+
+## Criterios específicos para una presentación del Data Lab
+
+Cuando la presentación trate sobre un laboratorio de datos:
+
+* No empezar describiendo el laboratorio.
+* Empezar con el problema de tomar decisiones sin comprender los datos.
+* Presentar el Data Lab como un espacio de colaboración, experimentación y solución de problemas.
+* Evitar definirlo únicamente como un lugar para aprender herramientas.
+* Mostrar la analítica como un puente entre preguntas y decisiones.
+* Destacar la colaboración entre estudiantes, profesores, investigadores y organizaciones.
+* Traducir los modelos analíticos a decisiones concretas.
+
+## Caso RFM
+
+Si se presenta el modelo RFM:
+
+* Explicar Recencia, Frecuencia y Valor Monetario de forma simple.
+* No dedicar demasiado tiempo a fórmulas.
+* Mostrar cómo clientes aparentemente similares revelan comportamientos diferentes.
+* Utilizar segmentos comprensibles, como:
+
+  * clientes de alto valor,
+  * clientes fieles,
+  * clientes nuevos con potencial,
+  * clientes en riesgo,
+  * clientes inactivos.
+* Conectar cada segmento con una acción.
+* Explicar ventajas y limitaciones sin desacreditar el modelo.
+* Aclarar que RFM es una puerta de entrada a modelos analíticos más avanzados.
+
+## Estructura recomendada para el pitch del Data Lab
+
+1. El problema: tenemos muchos datos, pero no siempre mejores decisiones.
+2. La oportunidad: convertir información en conocimiento útil.
+3. El Data Lab: un espacio para resolver retos reales de manera colaborativa.
+4. El ejemplo: segmentación de clientes mediante RFM.
+5. La decisión: qué acciones permite tomar el análisis.
+6. El impacto: aplicaciones en empresas, investigación y universidad.
+7. La invitación: traer preguntas, retos, proyectos y datos al laboratorio.
+
+## Cierre
+
+La última diapositiva debe tener una frase breve, memorable y accionable.
+
+Ejemplos de intención:
+
+* Los datos no cambian el mundo. Las decisiones sí.
+* Trae tu pregunta. Construyamos la respuesta.
+* De los datos a las decisiones.
+* Los datos adquieren valor cuando nos ayudan a actuar.
+
+No mostrar varias frases de cierre. Seleccionar una sola.
+
+## Entregables
+
+Cuando se solicite generar la presentación, entregar:
+
+1. Archivo editable de la presentación.
+2. Guion del presentador.
+3. Notas por diapositiva.
+4. Tiempo estimado por diapositiva.
+5. Recursos visuales utilizados.
+6. Una versión lista para presentar en pantalla panorámica 16:9.
+7. Una revisión final que verifique:
+
+   * ausencia de desbordamientos,
+   * legibilidad,
+   * consistencia visual,
+   * ortografía,
+   * alineación,
+   * calidad de imágenes,
+   * duración total,
+   * claridad del llamado a la acción.
+
+Antes de finalizar, revisar la presentación como si se fuera a presentar ante una audiencia real. Eliminar cualquier elemento que no ayude a comprender, sentir o recordar la idea central.

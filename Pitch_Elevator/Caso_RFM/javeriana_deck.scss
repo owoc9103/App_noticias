@@ -1,0 +1,378 @@
+/*-- scss:defaults --*/
+
+$javeriana-brand: #2C5697;
+$javeriana-accent: #1e3d6b;
+$javeriana-amarillo: #F8CD00;
+$javeriana-bg: #ffffff;
+$javeriana-text: #141c26;
+$javeriana-gris: #5a6472;
+
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap');
+
+$font-family-sans-serif: "Source Sans 3", "Helvetica Neue", Arial, sans-serif !default;
+$presentation-heading-font: "Source Sans 3", "Helvetica Neue", Arial, sans-serif !default;
+
+$body-bg: #f0f2f5;
+$body-color: $javeriana-text;
+$link-color: $javeriana-brand;
+$presentation-heading-color: $javeriana-brand;
+
+/*-- scss:rules --*/
+
+// Lógica Infinito pitch-deck: tarjeta por slide + franja inferior
+.reveal {
+  color: $javeriana-text;
+  font-family: $font-family-sans-serif;
+}
+
+.reveal::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  background: linear-gradient(90deg, $javeriana-brand, $javeriana-accent);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.reveal .slides {
+  text-align: left;
+}
+
+.reveal .slides section.deck-slide {
+  padding: 24px 40px !important;
+  border-left: 6px solid $javeriana-brand;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+  background: $javeriana-bg;
+  box-sizing: border-box;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: flex-start;
+  height: 100%;
+  overflow: visible !important;
+}
+
+.reveal .slides section.deck-slide-accent {
+  border-left-color: $javeriana-amarillo;
+  background: linear-gradient(135deg, $javeriana-brand 0%, $javeriana-accent 100%);
+  color: $javeriana-bg;
+}
+
+.reveal h1,
+.reveal h2,
+.reveal h3 {
+  color: $javeriana-brand;
+  letter-spacing: 0.2px;
+  text-transform: none;
+  font-weight: 700;
+}
+
+.reveal .deck-slide-accent h2 {
+  color: $javeriana-amarillo;
+}
+
+.reveal .deck-slide h2 {
+  font-size: 1.45em !important;
+  margin: 0 0 0.5em 0 !important;
+  border: none !important;
+  padding: 0 !important;
+  line-height: 1.15 !important;
+}
+
+.reveal .deck-tag {
+  font-size: 0.52em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: $javeriana-gris;
+  margin-bottom: 0.35em;
+}
+
+.reveal .deck-slide-accent .deck-tag {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.reveal p,
+.reveal li {
+  font-size: 0.78em;
+  line-height: 1.45;
+  color: $javeriana-text;
+}
+
+.reveal .deck-slide-accent p,
+.reveal .deck-slide-accent li {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.reveal ul {
+  margin: 0.35em 0 0.65em 0;
+}
+
+.reveal ul li::marker {
+  color: $javeriana-brand;
+}
+
+.reveal .deck-slide-accent ul li::marker {
+  color: $javeriana-amarillo;
+}
+
+.reveal strong {
+  color: $javeriana-accent;
+  font-weight: 700;
+}
+
+.reveal .deck-slide-accent strong {
+  color: $javeriana-amarillo;
+}
+
+.reveal .deck-callout {
+  font-size: 0.78em;
+  font-weight: 500;
+  margin-top: 0.5em;
+  padding: 0.75em 1em;
+  border-radius: 8px;
+  border: 2px solid rgba($javeriana-brand, 0.15);
+  background: rgba($javeriana-brand, 0.04);
+  color: $javeriana-text;
+}
+
+.reveal .deck-callout p {
+  margin: 0;
+}
+
+.reveal .deck-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75em;
+  margin: 0.45em 0 0.65em;
+}
+
+.reveal .deck-card {
+  background: $javeriana-bg;
+  border: 1px solid rgba($javeriana-brand, 0.12);
+  border-radius: 8px;
+  padding: 0.65em 0.75em;
+  font-size: 0.68em;
+  line-height: 1.35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.reveal .deck-card strong:first-child {
+  display: block;
+  font-size: 0.9em;
+  color: $javeriana-brand;
+  margin-bottom: 0.25em;
+}
+
+.reveal .deck-card-r { border-top: 3px solid #e74c3c; }
+.reveal .deck-card-f { border-top: 3px solid $javeriana-brand; }
+.reveal .deck-card-m { border-top: 3px solid $javeriana-amarillo; }
+
+.reveal .rfm-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4em;
+  height: 1.4em;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 0.85em;
+  margin-right: 0.25em;
+  color: #fff;
+}
+
+.reveal .rfm-letter.r { background: #e74c3c; }
+.reveal .rfm-letter.f { background: $javeriana-brand; }
+.reveal .rfm-letter.m { background: $javeriana-amarillo; color: $javeriana-text; }
+
+.reveal .weight-bar { margin-top: 0.3em; }
+
+.reveal .weight-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-bottom: 0.35em;
+  font-size: 0.65em;
+}
+
+.reveal .weight-label {
+  width: 5.5em;
+  font-weight: 600;
+  color: $javeriana-brand;
+}
+
+.reveal .weight-track {
+  flex: 1;
+  height: 0.5em;
+  background: rgba($javeriana-brand, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.reveal .weight-fill { height: 100%; border-radius: 999px; }
+.reveal .weight-fill.m { background: $javeriana-brand; width: 60%; }
+.reveal .weight-fill.f { background: lighten($javeriana-brand, 12%); width: 30%; }
+.reveal .weight-fill.r { background: #c0392b; width: 10%; }
+
+.reveal .weight-pct {
+  width: 2em;
+  font-weight: 700;
+  color: $javeriana-brand;
+  text-align: right;
+  font-size: 0.95em;
+}
+
+.reveal .rfm-scheme {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  margin-top: 0.3em;
+  font-size: 0.58em;
+}
+
+.reveal .rfm-node {
+  background: #fff;
+  border: 1px solid rgba($javeriana-brand, 0.2);
+  border-radius: 8px;
+  padding: 0.4em 0.5em;
+  text-align: center;
+  min-width: 4.8em;
+}
+
+.reveal .rfm-node strong { color: $javeriana-brand; display: block; }
+.reveal .rfm-arrow { color: $javeriana-amarillo; font-weight: 700; }
+
+.reveal .rfm-result {
+  background: $javeriana-brand;
+  color: #fff;
+  border: none;
+}
+
+.reveal .rfm-result strong { color: $javeriana-amarillo; }
+
+.reveal .deck-segments {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6em;
+  margin: 0.4em 0 0.55em;
+}
+
+.reveal .seg {
+  text-align: center;
+  padding: 0.65em 0.3em;
+  border-radius: 8px;
+  font-size: 0.72em;
+  font-weight: 700;
+  border: 1px solid rgba($javeriana-brand, 0.15);
+}
+
+.reveal .seg-d { background: $javeriana-brand; color: #fff; }
+.reveal .seg-o { background: lighten($javeriana-brand, 8%); color: #fff; }
+.reveal .seg-p { background: rgba($javeriana-brand, 0.08); color: $javeriana-brand; }
+.reveal .seg-b { background: rgba($javeriana-amarillo, 0.35); color: $javeriana-text; }
+
+.reveal .deck-profiles {
+  margin: 0.3em 0 0.5em;
+}
+
+.reveal .deck-profiles ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  gap: 0.5em 0.75em;
+}
+
+.reveal .deck-profiles li {
+  font-size: 0.72em;
+  font-weight: 600;
+  padding: 0.4em 0.6em;
+  border-radius: 6px;
+  background: rgba($javeriana-brand, 0.05);
+  border: 1px solid rgba($javeriana-brand, 0.1);
+}
+
+.reveal .deck-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76em;
+  margin: 0.35em 0 0.5em;
+}
+
+.reveal .deck-table thead th {
+  background: $javeriana-brand;
+  color: #fff;
+  padding: 0.5em 0.75em;
+  text-align: center;
+}
+
+.reveal .deck-table tbody td {
+  padding: 0.48em 0.75em;
+  border-bottom: 1px solid rgba($javeriana-brand, 0.08);
+}
+
+.reveal .deck-table tbody tr:nth-child(even) td {
+  background: rgba($javeriana-brand, 0.03);
+}
+
+.reveal .deck-quote {
+  font-size: 1.25em;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0.25em 0 0.65em;
+  color: #fff;
+}
+
+.reveal .deck-tagline {
+  font-size: 0.82em;
+  font-weight: 600;
+  font-style: italic;
+  margin-top: 0.75em;
+  padding-top: 0.65em;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  color: $javeriana-amarillo;
+}
+
+.reveal .column {
+  font-size: 0.78em;
+}
+
+.reveal .slide-number {
+  color: $javeriana-gris !important;
+  font-size: 0.5em !important;
+}
+
+.reveal .footer {
+  font-size: 0.42em !important;
+  color: $javeriana-gris !important;
+}
+
+.reveal .controls {
+  color: $javeriana-brand !important;
+}
+
+.reveal .progress {
+  background: rgba($javeriana-brand, 0.12);
+  height: 4px;
+}
+
+.reveal .progress span {
+  background: $javeriana-brand;
+}
+
+.reveal .slides > section.deck-slide section {
+  display: block !important;
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
