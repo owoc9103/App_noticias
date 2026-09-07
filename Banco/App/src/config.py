@@ -15,13 +15,23 @@ MAX_CANDIDATES_PER_SOURCE = 8
 MAX_BODY_CHARS = 7000
 TOP_N = 7
 
-DEFAULT_VOICE = "es-CO-GonzaloNeural"
-VOICES = {
-    "es-CO-GonzaloNeural": "Gonzalo · Colombia (recomendado, tono noticioso)",
-    "es-CO-SalomeNeural": "Salomé · Colombia",
-    "es-MX-JorgeNeural": "Jorge · México",
-    "es-ES-AlvaroNeural": "Álvaro · España",
+DEFAULT_READER = "hombre"
+READERS = {
+    "hombre": {
+        "label": "Hombre",
+        "voice": "es-CO-GonzaloNeural",
+        "name": "Gonzalo",
+        "accent": "Colombia",
+    },
+    "mujer": {
+        "label": "Mujer",
+        "voice": "es-CO-SalomeNeural",
+        "name": "Salomé",
+        "accent": "Colombia",
+    },
 }
+DEFAULT_VOICE = READERS[DEFAULT_READER]["voice"]
+VOICES = {info["voice"]: f'{info["name"]} · {info["accent"]}' for info in READERS.values()}
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

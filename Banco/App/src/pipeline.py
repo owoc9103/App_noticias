@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Callable
 from zoneinfo import ZoneInfo
 
-from src.config import SOURCE_BY_ID, SOURCES, TOP_N, Source
+from src.config import DEFAULT_READER, READERS, SOURCE_BY_ID, SOURCES, TOP_N, Source
 from src.fetch_news import collect_all, enrich_bodies
 from src.models import Briefing
 from src.podcast import build_script, synthesize
@@ -22,9 +22,15 @@ def selected_sources(ids: list[str] | None) -> list[Source]:
     return [SOURCE_BY_ID[i] for i in ids if i in SOURCE_BY_ID]
 
 
+def reader_voice(reader_key: str) -> tuple[str, str, str]:
+    info = READERS.get(reader_key, READERS[DEFAULT_READER])
+    return info["voice"], info["label"], reader_key if reader_key in READERS else DEFAULT_READER
+
+
 def run_briefing(
     source_ids: list[str] | None = None,
-    voice: str = "es-CO-GonzaloNeural",
+    voice: str | None = None,
+    reader_key: str = DEFAULT_READER,
     use_llm: bool = True,
     use_cache: bool = True,
     make_audio: bool = True,
@@ -54,10 +60,14 @@ def run_briefing(
     note("Escribiendo el guion del noticiero…")
     script = build_script(top, reco)
 
+    chosen_voice, reader_label, reader_key = reader_voice(reader_key)
+    if voice:
+        chosen_voice = voice
+
     audio_path = ""
     if make_audio:
-        note("Generando el podcast en español…")
-        audio_path = str(synthesize(script, voice=voice))
+        note(f"Generando el podcast en español con voz de {reader_label.lower()}…")
+        audio_path = str(synthesize(script, voice=chosen_voice))
 
     note("Briefing listo.")
     return Briefing(
@@ -69,6 +79,8 @@ def run_briefing(
         sources_ok=sorted(ok),
         sources_fail=sorted(fail),
         candidates=len(candidates),
+        reader_key=reader_key,
+        reader_label=reader_label,
     )
 
 

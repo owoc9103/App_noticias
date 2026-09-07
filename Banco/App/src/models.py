@@ -30,3 +30,5 @@ class Briefing:
     sources_ok: list[str] = field(default_factory=list)
     sources_fail: list[str] = field(default_factory=list)
     candidates: int = 0
+    reader_key: str = "hombre"
+    reader_label: str = "Hombre"
