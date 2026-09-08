@@ -32,15 +32,20 @@ def briefing_pdf(briefing: Briefing) -> bytes:
         pdf.multi_cell(0, 6, text or " ", new_x="LMARGIN", new_y="NEXT")
 
     when = briefing.generated_at.strftime("%Y-%m-%d %H:%M") if briefing.generated_at else ""
-    write(16, "Briefing económico DATA-LAB · Javeriana Cali", bold=True)
-    write(10, f"{when} · Lectura académica de coyuntura, no es asesoría de inversión.")
+    write(16, "DATA-LAB Market Briefing · Javeriana Cali", bold=True)
+    write(10, f"{when} · Global markets & Colombia")
+    write(10, "Lectura académica de coyuntura. No constituye asesoría de inversión.")
     pdf.ln(2)
     if briefing.market:
         write(11, "Mercado", bold=True)
         write(10, "  ·  ".join(f"{k}: {v}" for k, v in briefing.market.items() if k != "Fuente"))
         pdf.ln(1)
-    write(11, "Recomendación", bold=True)
-    write(10, briefing.recommendation)
+    takeaways = list(getattr(briefing, "takeaways", None) or [])
+    if not takeaways:
+        takeaways = [line.strip() for line in (briefing.recommendation or "").splitlines() if line.strip()][:3]
+    write(11, "Key Takeaways", bold=True)
+    for point in takeaways:
+        write(10, f"• {point}")
     pdf.ln(2)
     write(11, "Top 7", bold=True)
     for idx, item in enumerate(briefing.items, start=1):
@@ -62,9 +67,9 @@ def briefing_share_text(briefing: Briefing) -> str:
     when = briefing.generated_at.strftime("%Y-%m-%d %H:%M") if briefing.generated_at else ""
     profile = PROFILES.get(briefing.profile, briefing.profile)
     lines = [
-        "Briefing económico DATA-LAB · Javeriana Cali",
-        f"{when} · perfil {profile}",
-        "Lectura académica de coyuntura, no es asesoría de inversión.",
+        "DATA-LAB Market Briefing · Javeriana Cali",
+        f"{when} · Global markets & Colombia · {profile}",
+        "Lectura académica de coyuntura. No constituye asesoría de inversión.",
         "",
     ]
     if briefing.market:
@@ -81,8 +86,12 @@ def briefing_share_text(briefing: Briefing) -> str:
         if item.summary_es:
             lines.append(item.summary_es)
         lines.append("")
-    lines.append("Recomendación")
-    lines.append(briefing.recommendation)
+    takeaways = list(getattr(briefing, "takeaways", None) or [])
+    if not takeaways:
+        takeaways = [line.strip() for line in (briefing.recommendation or "").splitlines() if line.strip()][:3]
+    lines.append("Key Takeaways")
+    for point in takeaways:
+        lines.append(f"• {point}")
     lines.append("")
     lines.append(PODCAST_SIGN_OFF)
     return "\n".join(lines)

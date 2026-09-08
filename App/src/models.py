@@ -28,6 +28,7 @@ class NewsItem:
 class Briefing:
     items: list[NewsItem] = field(default_factory=list)
     recommendation: str = ""
+    takeaways: list[str] = field(default_factory=list)
     script: str = ""
     audio_path: str = ""
     generated_at: datetime | None = None

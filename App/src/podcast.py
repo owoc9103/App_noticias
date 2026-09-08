@@ -45,6 +45,31 @@ def greeting(now: datetime | None = None) -> str:
     return "Buenas noches"
 
 
+def greeting_en(now: datetime | None = None) -> str:
+    now = now or datetime.now(BOGOTA)
+    hour = now.hour
+    if hour < 12:
+        return "Good morning"
+    if hour < 19:
+        return "Good afternoon"
+    return "Good evening"
+
+
+def spoken_blurb(item: NewsItem) -> str:
+    text = (item.summary_es or item.snippet or item.title).strip()
+    title = item.title.rstrip(".").strip()
+    if text.lower().startswith(title.lower()):
+        text = text[len(title) :].lstrip(" .:-")
+    parts = [part.strip() for part in re.split(r"(?<=[\.!?…])\s+", text) if part.strip()]
+    keep: list[str] = []
+    for part in parts:
+        keep.append(part)
+        joined = " ".join(keep)
+        if len(keep) >= 2 or len(joined) >= 180:
+            break
+    return (" ".join(keep) or title)[:320]
+
+
 def item_is_english(item: NewsItem) -> bool:
     return detect_item_language(item) == "en"
 
@@ -90,56 +115,74 @@ def _edge_pair(reader_key: str) -> tuple[str, str]:
     )
 
 
+def _takeaway_lines(recommendation: str) -> list[str]:
+    lines: list[str] = []
+    for raw in recommendation.replace("\r", "").splitlines():
+        line = raw.strip().lstrip("•-*").strip()
+        if not line:
+            continue
+        low = line.lower()
+        if "asesoría" in low or "asesoria" in low:
+            continue
+        lines.append(line)
+    if lines:
+        return lines[:3]
+    compact = re.sub(r"\s+", " ", recommendation).strip()
+    return [compact[:180]] if compact else []
+
+
+SECTION_OPEN = {
+    "markets": ("Starting with global markets.", "en"),
+    "policy": ("Turning to monetary policy.", "en"),
+    "fx": ("On the dollar and FX.", "en"),
+    "commodities": ("Now in commodities.", "en"),
+    "colombia": ("In Colombia.", "es"),
+}
+
+
 def build_cues(
     items: list[NewsItem],
     recommendation: str,
     now: datetime | None = None,
     reader_key: str = DEFAULT_READER,
 ) -> list[_Cue]:
+    from src.rank import item_section
+
     now = now or datetime.now(BOGOTA)
-    meses = (
-        "enero", "febrero", "marzo", "abril", "mayo", "junio",
-        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-    )
-    fecha = f"{now.day} de {meses[now.month - 1]} de {now.year}"
     body, title, close = _tone(reader_key)
     cues = [
-        _Cue(f"{greeting(now)}. Desde Cali, DATA LAB de la Javeriana.", 620, *body, "es"),
-        _Cue(f"Es {fecha}.", 700, *body, "es"),
         _Cue(
-            "Presentamos el top siete. Colombia en español; el mundo, en el idioma original.",
+            f"{greeting_en(now)}. Here are the most important developments moving global markets today.",
+            720,
+            *body,
+            "en",
+        ),
+        _Cue(
+            "This briefing is from DATA-LAB at Javeriana Cali. International stories stay in English. Colombia, in Spanish.",
             780,
             *body,
-            "es",
+            "en",
         ),
     ]
-    for idx, item in enumerate(items, start=1):
-        title_text = item.title.rstrip(".")
-        summary = (item.summary_es or item.snippet or title_text).strip()
-        if item_is_english(item):
-            ordinal = EN_ORDINALS.get(idx, f"number {idx}")
-            cues.append(
-                _Cue(
-                    f"Story {ordinal}. {item.source_name}. {title_text}. {summary}",
-                    380,
-                    *title,
-                    "en",
-                )
-            )
-        else:
-            ordinal = ORDINALS.get(idx, f"noticia número {idx}")
-            cues.append(
-                _Cue(
-                    f"La {ordinal} noticia. {item.source_name}. {title_text}. {summary}",
-                    380,
-                    *title,
-                    "es",
-                )
-            )
-    cues.append(_Cue("Cierre de edición. Recomendación financiera del día.", 900, *title, "es"))
-    if recommendation.strip():
-        reco_lang = "en" if looks_english(recommendation) else "es"
-        cues.append(_Cue(recommendation.strip(), 560, *body, reco_lang))
+    last_section = ""
+    for idx, item in enumerate(items):
+        section = item_section(item)
+        lang = "en" if item_is_english(item) else "es"
+        is_last = idx == len(items) - 1
+        if is_last and items:
+            cues.append(_Cue("And finally." if lang == "en" else "Y para cerrar.", 520, *title, lang))
+        elif section != last_section:
+            opener, opener_lang = SECTION_OPEN.get(section, ("Next.", lang))
+            cues.append(_Cue(opener, 620, *title, opener_lang))
+        last_section = section
+        blurb = spoken_blurb(item)
+        cues.append(_Cue(f"{item.source_name}. {blurb}", 420, *body, lang))
+    takeaways = _takeaway_lines(recommendation)
+    if takeaways:
+        cues.append(_Cue("Three takeaways.", 700, *title, "en"))
+        for point in takeaways:
+            point_lang = "en" if looks_english(point) else "es"
+            cues.append(_Cue(point, 480, *body, point_lang))
     cues.append(_Cue(PODCAST_SIGN_OFF, 250, *close, "es"))
     return cues
 
@@ -154,15 +197,27 @@ def _cues_from_script(script: str, reader_key: str = DEFAULT_READER) -> list[_Cu
         pause = 420
         rate, pitch = body
         lang = "en" if looks_english(sentence) else "es"
-        if low.startswith(("buenos días", "buenas tardes", "buenas noches")):
+        if low.startswith(("good morning", "good afternoon", "good evening")):
+            pause = 720
+            lang = "en"
+        elif low.startswith(("buenos días", "buenas tardes", "buenas noches")):
             pause = 620
             lang = "es"
-        elif low.startswith("es ") and " de " in low:
+        elif low.startswith(("starting with", "turning to", "now in", "on the dollar")):
+            pause = 620
+            rate, pitch = title
+            lang = "en"
+        elif low.startswith("in colombia") or low.startswith("y para cerrar"):
+            pause = 620
+            rate, pitch = title
+            lang = "es" if low.startswith("y para") or "colombia" in low else lang
+        elif low.startswith("and finally") or low.startswith("three takeaways"):
             pause = 700
-            lang = "es"
-        elif "presentamos el top" in low or "data lab" in low:
+            rate, pitch = title
+            lang = "en"
+        elif low.startswith("this briefing is from"):
             pause = 780
-            lang = "es"
+            lang = "en"
         elif re.match(r"^la (primera|segunda|tercera|cuarta|quinta|sexta|séptima|noticia)", low):
             pause = 380
             rate, pitch = title
@@ -206,6 +261,7 @@ def _pack_cues(cues: list[_Cue]) -> list[_Cue]:
         new_block = bool(
             re.match(r"^la (primera|segunda|tercera|cuarta|quinta|sexta|séptima)\b", low)
             or re.match(r"^story (first|second|third|fourth|fifth|sixth|seventh|number)\b", low)
+            or low.startswith(("starting with", "turning to", "now in", "on the dollar", "in colombia", "and finally", "three takeaways", "y para cerrar"))
             or "cierre de edición" in low
             or PODCAST_SIGN_OFF.lower() in low
             or (bucket and bucket[-1].lang != cue.lang)

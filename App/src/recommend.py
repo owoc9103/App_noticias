@@ -124,26 +124,71 @@ def _profile_close(items: list[NewsItem], profile: str) -> str:
     )
 
 
+def key_takeaways(items: list[NewsItem], profile: str = "tesoreria") -> list[str]:
+    t = detect_themes(items)
+    out: list[str] = []
+    if t["alza_tasas"] or t["baja_tasas"] or t.get("tasas"):
+        out.append("US and global rates remain the main driver of markets.")
+    if t["petroleo"]:
+        out.append("Oil continues to affect Colombia’s fiscal outlook.")
+    if t["dolar_alza"]:
+        out.append("USD/COP volatility remains elevated.")
+    if t["inflacion"] and len(out) < 3:
+        out.append("Inflation is back on the radar for policy and prices.")
+    if t["empleo"] and len(out) < 3:
+        out.append("Labor data will shape the next move in rates.")
+    if t["riesgo"] and len(out) < 3:
+        out.append("Risk sentiment is fragile; liquidity still matters.")
+    if t["fiscal"] and len(out) < 3:
+        out.append("Fiscal news in Colombia can move TES and the peso.")
+    if t["oficial"] and len(out) < 3:
+        out.append("Official Colombian data should anchor the local read.")
+    if not out:
+        out.append("No single shock dominates; stay diversified and liquid.")
+    if len(out) < 2:
+        out.append("Colombia remains a complementary block to the global tape.")
+    if profile == "tesoreria" and len(out) < 3:
+        out.append("Keep cash buffers until the next official print.")
+    elif len(out) < 3:
+        out.append("Watch the next official print before changing the base case.")
+    return out[:3]
+
+
+def _parse_takeaway_lines(text: str) -> list[str]:
+    lines: list[str] = []
+    for raw in text.replace("\r", "").splitlines():
+        line = raw.strip().lstrip("•-*").strip()
+        if not line:
+            continue
+        low = line.lower()
+        if "asesoría" in low or "asesoria" in low or "disclaimer" in low:
+            continue
+        if len(line) > 180:
+            continue
+        lines.append(line)
+    return lines[:3]
+
+
 def recommend(items: list[NewsItem], use_llm: bool = True, profile: str = "tesoreria") -> str:
-    body = rule_recommendation(items).replace(DISCLAIMER, "").strip()
-    baseline = f"{body} {_profile_close(items, profile)} {DISCLAIMER}".strip()
-    if not use_llm:
-        return baseline
-    material = "\n".join(
-        f"- {i.source_name}: {i.title}. {i.summary_es} [{', '.join(i.tags)}]" for i in items
-    )
-    polished = _llm_chat(
-        [
-            {"role": "system", "content": LLM_SYSTEM},
-            {
-                "role": "user",
-                "content": (
-                    "Con estas 7 noticias, redacta una recomendación financiera de coyuntura "
-                    f"en 3 párrafos cortos para un perfil de {profile} en Colombia. "
-                    "Usa las etiquetas de impacto. No des tickers para comprar. "
-                    f"Cierra el último párrafo con: {DISCLAIMER}\n\n{material}"
-                ),
-            },
-        ]
-    )
-    return polished or baseline
+    points = key_takeaways(items, profile)
+    if use_llm:
+        material = "\n".join(
+            f"- {i.source_name}: {i.title}. {i.summary_es} [{', '.join(i.tags)}]" for i in items
+        )
+        polished = _llm_chat(
+            [
+                {"role": "system", "content": LLM_SYSTEM},
+                {
+                    "role": "user",
+                    "content": (
+                        "Write exactly 3 short Key Takeaways for a bilingual market briefing. "
+                        "One line each, max 18 words, English. No tickers to buy. "
+                        f"Audience profile: {profile}. Return only the 3 lines.\n\n{material}"
+                    ),
+                },
+            ]
+        )
+        parsed = _parse_takeaway_lines(polished or "")
+        if len(parsed) >= 2:
+            points = parsed[:3]
+    return "\n".join(points)

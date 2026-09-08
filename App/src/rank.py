@@ -191,6 +191,26 @@ def annotate_item(item: NewsItem) -> NewsItem:
     return item
 
 
+def item_section(item: NewsItem) -> str:
+    if item.category != "internacional":
+        return "colombia"
+    tags = set(item.tags)
+    if tags & {"tasas", "inflacion", "empleo"}:
+        return "policy"
+    if "petroleo" in tags:
+        return "commodities"
+    if "dolar" in tags:
+        return "fx"
+    return "markets"
+
+
+SECTION_ORDER = {"markets": 0, "policy": 1, "fx": 2, "commodities": 3, "colombia": 4}
+
+
+def order_for_briefing(items: list[NewsItem]) -> list[NewsItem]:
+    return sorted(items, key=lambda item: (SECTION_ORDER.get(item_section(item), 9), -item.score))
+
+
 def pick_top(items: list[NewsItem], n: int = TOP_N) -> list[NewsItem]:
     usable = [item for item in items if not is_junk(item)]
     relevant = [item for item in usable if is_relevant(item)]
@@ -201,48 +221,39 @@ def pick_top(items: list[NewsItem], n: int = TOP_N) -> list[NewsItem]:
 
     chosen: list[NewsItem] = []
     per_source: dict[str, int] = {}
-    counts = {"nacional": 0, "internacional": 0, "oficial": 0}
+    intl_need = max(1, min(n - 1, round(n * 0.75)))
+    col_need = n - intl_need
+    used: set[int] = set()
 
     def can_take(item: NewsItem, relax: bool) -> bool:
-        if per_source.get(item.source_id, 0) >= (2 if relax else 1):
-            if not relax:
-                return False
-            if per_source.get(item.source_id, 0) >= 2:
-                return False
+        taken = per_source.get(item.source_id, 0)
+        if taken >= (2 if relax else 1):
+            return False
         return True
 
     def take(item: NewsItem) -> None:
         chosen.append(item)
         per_source[item.source_id] = per_source.get(item.source_id, 0) + 1
-        counts[item.category] = counts.get(item.category, 0) + 1
+        used.add(id(item))
 
-    intl_need = 5 if n >= 10 else 4
-    quotas = (("internacional", min(intl_need, n - 2)), ("nacional", 1), ("oficial", 1))
-    used: set[str] = set()
-    for category, need in quotas:
+    def fill(predicate, need: int, relax: bool) -> None:
+        if need <= 0:
+            return
+        got = 0
         for item in ranked:
-            if id(item) in used or item.category != category:
+            if got >= need or id(item) in used:
                 continue
-            if not can_take(item, relax=False):
+            if not predicate(item) or not can_take(item, relax):
                 continue
             take(item)
-            used.add(id(item))
-            if counts[category] >= need:
-                break
+            got += 1
 
-    for prefer_intl in (True, False):
-        for relax in (False, True):
-            for item in ranked:
-                if len(chosen) >= n:
-                    break
-                if id(item) in used:
-                    continue
-                if prefer_intl and item.category != "internacional":
-                    continue
-                if not can_take(item, relax=relax):
-                    continue
-                take(item)
-                used.add(id(item))
-
-    chosen.sort(key=lambda i: i.score, reverse=True)
-    return chosen[:n]
+    is_intl = lambda item: item.category == "internacional"
+    is_col = lambda item: item.category in {"nacional", "oficial"}
+    fill(is_intl, intl_need, False)
+    fill(is_col, col_need, False)
+    fill(is_intl, n - len(chosen), False)
+    fill(is_col, n - len(chosen), False)
+    fill(is_intl, n - len(chosen), True)
+    fill(lambda _item: True, n - len(chosen), True)
+    return order_for_briefing(chosen[:n])

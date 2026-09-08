@@ -10,8 +10,8 @@ from src.history import delta_vs_yesterday, save_briefing
 from src.markets import fetch_markets
 from src.models import Briefing
 from src.podcast import build_script, synthesize
-from src.rank import annotate_item, pick_top, score_item
-from src.recommend import recommend
+from src.rank import annotate_item, order_for_briefing, pick_top, score_item
+from src.recommend import key_takeaways, recommend
 from src.summarize import summarize_many
 
 ProgressFn = Callable[[str], None]
@@ -63,23 +63,25 @@ def run_briefing(
         preselected = pick_top(candidates, n=min(12, max(TOP_N * 2, 10)))
         enrich_bodies(preselected, limit=10, progress=None)
 
-        top = pick_top(preselected or candidates, n=TOP_N)
+        top = order_for_briefing(pick_top(preselected or candidates, n=TOP_N))
         for item in top:
             annotate_item(item)
 
-        note("Redactando resúmenes en el idioma de cada nota…")
         summarize_many(top, use_llm=use_llm)
         for item in top:
             annotate_item(item)
+        top = order_for_briefing(top)
 
         chosen_voice, reader_label, reader_key = reader_voice(reader_key)
         if voice:
             chosen_voice = voice
 
-        note("Elaborando la recomendación financiera…")
+        takeaways = key_takeaways(top, profile=profile)
         reco = recommend(top, use_llm=use_llm, profile=profile)
+        if reco.strip():
+            takeaways = [line.strip() for line in reco.splitlines() if line.strip()][:3] or takeaways
+        reco = "\n".join(takeaways)
 
-        note("Escribiendo el guion bilingüe…")
         script = build_script(top, reco, reader_key=reader_key)
 
         audio_path = ""
@@ -105,6 +107,7 @@ def run_briefing(
         briefing = Briefing(
             items=top,
             recommendation=reco,
+            takeaways=takeaways,
             script=script,
             audio_path=audio_path,
             generated_at=datetime.now(BOGOTA),

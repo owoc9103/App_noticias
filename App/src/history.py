@@ -23,6 +23,7 @@ def save_briefing(briefing: Briefing) -> Path:
     payload = {
         "generated_at": briefing.generated_at.isoformat() if briefing.generated_at else None,
         "recommendation": briefing.recommendation,
+        "takeaways": list(briefing.takeaways or []),
         "script": briefing.script,
         "audio_path": briefing.audio_path,
         "candidates": briefing.candidates,
@@ -86,6 +87,7 @@ def load_briefing(day: datetime | None = None) -> Briefing | None:
     return Briefing(
         items=items,
         recommendation=raw.get("recommendation", ""),
+        takeaways=list(raw.get("takeaways") or []),
         script=raw.get("script", ""),
         audio_path=raw.get("audio_path", ""),
         generated_at=datetime.fromisoformat(stamp) if stamp else None,
