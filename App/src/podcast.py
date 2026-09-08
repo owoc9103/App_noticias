@@ -79,7 +79,15 @@ def _tone(reader_key: str) -> tuple[tuple[str, str], tuple[str, str], tuple[str,
 
 def english_voice(reader_key: str) -> str:
     info = READERS.get(reader_key, READERS[DEFAULT_READER])
-    return str(info.get("en_voice") or "en-US-GuyNeural")
+    return str(info.get("en_voice") or "am_michael")
+
+
+def _edge_pair(reader_key: str) -> tuple[str, str]:
+    info = READERS.get(reader_key, READERS[DEFAULT_READER])
+    return (
+        str(info.get("edge_voice") or "es-CO-GonzaloNeural"),
+        str(info.get("edge_en") or "en-US-GuyNeural"),
+    )
 
 
 def build_cues(
@@ -226,6 +234,78 @@ def _ensure_mp3(path: Path) -> Path:
     return path
 
 
+_KOKORO = {}
+
+
+def _prepare_espeak() -> None:
+    try:
+        import espeakng_loader
+        from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+        EspeakWrapper.set_library(espeakng_loader.get_library_path())
+        if hasattr(EspeakWrapper, "set_data_path"):
+            EspeakWrapper.set_data_path(espeakng_loader.get_data_path())
+    except Exception:
+        pass
+
+
+def _kokoro_pipeline(lang: str):
+    code = "e" if lang == "es" else "a"
+    pipe = _KOKORO.get(code)
+    if pipe is not None:
+        return pipe
+    import os
+
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+    _prepare_espeak()
+    from kokoro import KPipeline
+
+    pipe = KPipeline(lang_code=code, repo_id="hexgrad/Kokoro-82M")
+    _KOKORO[code] = pipe
+    return pipe
+
+
+def _kokoro_voice(lang: str, reader_key: str) -> str:
+    info = READERS.get(reader_key, READERS[DEFAULT_READER])
+    if lang == "en":
+        return str(info.get("en_voice") or "am_michael")
+    return str(info.get("voice") or "em_alex")
+
+
+def _speak_kokoro(cues: list[_Cue], path: Path, reader_key: str) -> None:
+    import numpy as np
+    import soundfile as sf
+
+    sample_rate = 24000
+    pieces: list[np.ndarray] = []
+    for cue in cues:
+        pipe = _kokoro_pipeline(cue.lang)
+        voice = _kokoro_voice(cue.lang, reader_key)
+        chunks: list[np.ndarray] = []
+        for _gs, _ps, audio in pipe(cue.text, voice=voice, speed=0.94):
+            if audio is None:
+                continue
+            chunk = np.asarray(audio, dtype=np.float32).reshape(-1)
+            if chunk.size:
+                chunks.append(chunk)
+        if not chunks:
+            raise RuntimeError(f"Kokoro no generó audio para un bloque en {cue.lang}")
+        block = np.concatenate(chunks)
+        if float(np.sqrt(np.mean(np.square(block)))) < 1e-4:
+            raise RuntimeError(f"Kokoro devolvió silencio en {cue.lang}")
+        pieces.append(block)
+        if cue.pause_ms:
+            hush = int(sample_rate * min(cue.pause_ms, 420) / 1000)
+            pieces.append(np.zeros(hush, dtype=np.float32))
+    wav = path.with_name(path.stem + "_kokoro.wav")
+    sf.write(str(wav), np.concatenate(pieces), sample_rate)
+    converted = _ensure_mp3(wav)
+    path.write_bytes(converted.read_bytes())
+    if converted != wav:
+        wav.unlink(missing_ok=True)
+
+
 def synthesize(
     script: str,
     voice: str = DEFAULT_VOICE,
@@ -244,10 +324,12 @@ def synthesize(
     )
     cues = _pack_cues(raw_cues)
     mp3 = AUDIO_DIR / f"briefing_{stamp}.mp3"
-    engines = (_speak_edge, _speak_gtts) if _edge_reachable() else (_speak_gtts, _speak_edge)
+    engines = (_speak_kokoro, _speak_gtts, _speak_edge) if not _edge_reachable() else (_speak_kokoro, _speak_edge, _speak_gtts)
     for engine in engines:
         try:
-            if engine is _speak_edge:
+            if engine is _speak_kokoro:
+                engine(cues, mp3, reader_key)
+            elif engine is _speak_edge:
                 engine(cues, voice, mp3, reader_key)
             else:
                 engine(cues, mp3)
@@ -390,13 +472,13 @@ async def _speak_edge_async(
 ) -> None:
     import edge_tts
 
-    voice_en = english_voice(reader_key)
+    voice_es, voice_en = _edge_pair(reader_key)
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp)
         clips: list[Path] = []
         for idx, cue in enumerate(cues):
             clip = folder / f"c{idx:03d}.mp3"
-            chosen = voice_en if cue.lang == "en" else voice
+            chosen = voice_en if cue.lang == "en" else voice_es
             communicate = edge_tts.Communicate(
                 text=cue.text,
                 voice=chosen,

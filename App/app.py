@@ -49,13 +49,6 @@ CAT_LABEL = {
     "internacional": "Mundo",
     "oficial": "Fuente oficial",
 }
-QUALITY_LABEL = {
-    "cuerpo": "Cuerpo de la nota",
-    "entradilla": "Solo entradilla pública",
-    "titular": "Solo titular público",
-}
-
-
 def lan_url() -> str:
     import socket
 
@@ -97,11 +90,11 @@ def hero() -> None:
               {img}
               <div>
                 <p class="jl-kicker">DATA LAB · Pontificia Universidad Javeriana Cali</p>
-                <h1>Briefing económico: top 7 noticias</h1>
-                <p>Más mundo que plaza local. Colombia en español; Reuters, FT o Bloomberg se oyen en inglés. Pensado para el carro.</p>
+                <h1>Briefing económico</h1>
+                <p>Top 7 del día. Colombia en español, el mundo en su idioma. Voz Kokoro.</p>
               </div>
             </div>
-            <div class="jl-badge">Podcast bilingüe</div>
+            <div class="jl-badge">DATA-LAB</div>
           </div>
         </div>
         """,
@@ -123,12 +116,10 @@ def render_item(idx: int, item) -> None:
             <span>{html.escape(item.source_name)}</span>
             <span>{CAT_LABEL.get(item.category, item.category)}</span>
             <span>{when}</span>
-            <span>{QUALITY_LABEL.get(item.body_quality, item.body_quality)}</span>
             <span>{"EN" if getattr(item, "language", "") == "en" else "ES"}</span>
           </div>
           <h3>{html.escape(item.title)}</h3>
           <p>{html.escape(item.summary_es)}</p>
-          <p class="jl-why">{html.escape(item.why)}</p>
           <div class="jl-chips">{chips}</div>
         </div>
         """,
@@ -143,44 +134,42 @@ def _render_podcast_panel(briefing, reader_key: str) -> None:
     @st.fragment(**fragment_kw)
     def panel() -> None:
         current = st.session_state.get("briefing") or briefing
-        st.markdown('<div class="jl-drive">', unsafe_allow_html=True)
-        st.subheader("Escuchar en el carro")
-        st.caption(
-            f"Lo lee: {current.reader_label} · español de Cali e inglés de noticiero. "
-            "Un toque a play; en iPhone, si no suena, descargue el MP3."
+        st.markdown('<div class="jl-player">', unsafe_allow_html=True)
+        st.markdown(
+            f"<h2>Podcast</h2><p>Kokoro · {html.escape(current.reader_label)}</p>",
+            unsafe_allow_html=True,
         )
         if current.audio_note:
-            st.warning(current.audio_note)
+            st.caption(current.audio_note)
         if current.audio_path and Path(current.audio_path).exists():
             audio_path = Path(current.audio_path)
             mime = audio_mime(audio_path)
             st.audio(str(audio_path.resolve()), format=mime, autoplay=st.session_state.get("drive_mode", False))
             st.download_button(
-                "Descargar MP3 para el celular o el carro",
+                "Descargar audio",
                 data=audio_path.read_bytes(),
                 file_name=audio_path.with_suffix(".mp3" if mime == "audio/mpeg" else audio_path.suffix).name,
                 mime=mime,
                 use_container_width=True,
             )
             if not st.session_state.get("drive_mode"):
-                st.caption("Capítulos")
-                for idx, item in enumerate(current.items, start=1):
-                    lang = "EN" if item.language == "en" else "ES"
-                    st.markdown(f"{idx}. [{lang}] {item.source_name}: {item.title}")
-                st.markdown(f"{len(current.items) + 1}. Recomendación financiera")
+                chapters = "".join(
+                    f"<li>{idx}. {html.escape(item.source_name)} — {html.escape(item.title)}</li>"
+                    for idx, item in enumerate(current.items, start=1)
+                )
+                st.markdown(f'<ul class="jl-chapters">{chapters}</ul>', unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
             return
         if not st.session_state.get("audio_job"):
-            st.caption("Pulse «Volver a narrar» para armar el audio. En el celular, descargue el MP3 y reprodúzcalo con la pantalla bloqueada.")
+            st.caption("Genere la edición o vuelva a narrar para oír el briefing.")
             st.markdown("</div>", unsafe_allow_html=True)
             return
         if not st.session_state.get("tts_armed"):
             st.session_state.tts_armed = True
-            st.info("Preparando el podcast… ya puede manejar; el audio aparece aquí en unos segundos.")
             st.markdown("</div>", unsafe_allow_html=True)
             return
         voice, _label, chosen = reader_voice(current.reader_key or reader_key)
-        with st.spinner("Narrando el noticiero bilingüe…"):
+        with st.spinner("Narrando…"):
             try:
                 current.audio_path = str(
                     synthesize(
@@ -191,11 +180,7 @@ def _render_podcast_panel(briefing, reader_key: str) -> None:
                         recommendation=current.recommendation,
                     )
                 )
-                current.audio_note = (
-                    "Se usó la voz local de Windows. Si el celular no reproduce WAV, descargue el archivo o vuelva a narrar con red."
-                    if current.audio_path.endswith(".wav")
-                    else ""
-                )
+                current.audio_note = "" if current.audio_path.endswith(".mp3") else "Audio en WAV. En el celular, descárguelo si no reproduce."
             except Exception as exc:
                 current.audio_note = f"El briefing quedó listo, pero el audio falló: {exc}"
         st.session_state.briefing = current
@@ -222,13 +207,6 @@ def main() -> None:
         st.session_state.drive_mode = str(st.query_params.get("drive", "")).lower() in {"1", "true", "si"}
 
     phone = f"{lan_url()}/?drive=1"
-    st.markdown(
-        f"<div class='jl-lan'><strong>En el celular:</strong> misma Wi-Fi y abra "
-        f"<a href='{html.escape(phone)}'>{html.escape(phone)}</a>. "
-        "Si no carga, permita Python en el firewall de Windows. "
-        "Para manejar: Modo al volante → Play o descargue el MP3.</div>",
-        unsafe_allow_html=True,
-    )
     top_l, top_r = st.columns(2)
     with top_l:
         st.toggle(
@@ -247,8 +225,8 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Edición")
-        st.caption("Si ya hay briefing de hoy, se abre de inmediato. Generar de nuevo actualiza la edición.")
-        st.caption(f"URL del celular: {phone}")
+        with st.expander("Celular"):
+            st.caption(phone)
         profile = st.radio(
             "Perfil de lectura",
             options=list(PROFILES),
@@ -278,15 +256,14 @@ def main() -> None:
             index=reader_keys.index(DEFAULT_READER),
             format_func=lambda key: READERS[key]["label"],
             horizontal=True,
-            help="Español con acento caleño; las notas en inglés las lee una voz de noticiero en inglés.",
+            help="Voces Kokoro: Alex o Dora en español; Michael o Heart en inglés.",
         )
         reader_key = reader_choice
         reader_info = READERS[reader_key]
-        st.caption(f"Voz ES: {reader_info['name']} · {reader_info['accent']} · EN: noticiero")
-        use_llm = st.toggle("Mejorar redacción con API (Groq u OpenAI)", value=False)
-        use_cache = st.toggle("Usar caché de 25 minutos", value=True)
-        make_audio = st.toggle("Generar podcast bilingüe", value=True)
-        st.caption("Opcional: cree un archivo .env con GROQ_API_KEY u OPENAI_API_KEY.")
+        st.caption(f"{reader_info['name']} · {reader_info['accent']}")
+        use_llm = st.toggle("Mejorar redacción con API", value=False)
+        use_cache = st.toggle("Usar caché", value=True)
+        make_audio = st.toggle("Generar podcast", value=True)
         run = st.button("Generar briefing del día", type="primary", use_container_width=True, key="run_sidebar")
         rerender = st.button(
             "Volver a narrar con esta voz",
@@ -314,42 +291,34 @@ def main() -> None:
         if not chosen:
             st.warning("Seleccione al menos una fuente.")
             return
-        status = st.status("Preparando la edición…", expanded=True)
-        def progress(message: str) -> None:
-            status.write(message)
         try:
-            briefing = run_briefing(
-                source_ids=chosen or default_ids,
-                reader_key=reader_key,
-                profile=profile,
-                use_llm=use_llm,
-                use_cache=use_cache,
-                make_audio=False,
-                progress=progress,
-            )
+            with st.spinner("Armando la edición…"):
+                briefing = run_briefing(
+                    source_ids=chosen or default_ids,
+                    reader_key=reader_key,
+                    profile=profile,
+                    use_llm=use_llm,
+                    use_cache=use_cache,
+                    make_audio=False,
+                    progress=None,
+                )
             st.session_state.briefing = briefing
             st.session_state.audio_job = make_audio
             st.session_state.tts_armed = False
-            status.update(label="Edición lista. El podcast se arma en segundo plano.", state="complete")
         except Exception as exc:
-            status.update(label="No se pudo completar la edición", state="error")
-            st.error(f"Error al construir el briefing: {exc}")
+            st.error(f"No se pudo armar la edición: {exc}")
             return
 
     briefing = st.session_state.briefing
     if not briefing:
-        st.info(
-            "Pulse **Generar briefing del día** para armar el top 7. "
-            "Si ya se generó hoy, la próxima apertura lo muestra al instante."
-        )
+        st.info("Pulse **Generar / actualizar briefing** para armar el top 7.")
         with st.expander("Fuentes que consulta la app"):
             for source in SOURCES:
                 st.markdown(f"- **{source.name}** · [{source.home}]({source.home})")
         return
 
     st.markdown(
-        "<div class='jl-disclaimer'><strong>Aviso:</strong> esta es una lectura académica de coyuntura "
-        "del DATA-LAB. No es asesoría de inversión personalizada ni una orden de compra o venta.</div>",
+        "<p class='jl-disclaimer'>Lectura académica de coyuntura. No es asesoría de inversión.</p>",
         unsafe_allow_html=True,
     )
 
@@ -367,7 +336,6 @@ def main() -> None:
             """,
             unsafe_allow_html=True,
         )
-        st.caption("Modo al volante: las fichas quedan ocultas. Apáguelo para leer el top 7.")
         return
 
     if briefing.market:
@@ -447,10 +415,6 @@ def main() -> None:
                     else:
                         st.caption("No se pudo abrir esa edición.")
         st.markdown('<p class="jl-signoff">Esto te lo dice la app de javeriana Cali</p>', unsafe_allow_html=True)
-        if briefing.sources_ok:
-            st.success("Fuentes con titulares: " + ", ".join(briefing.sources_ok))
-        if briefing.sources_fail:
-            st.warning("Sin piezas en esta ronda: " + ", ".join(briefing.sources_fail))
 
 
 if __name__ == "__main__":

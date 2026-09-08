@@ -1,7 +1,9 @@
 Set-Location $PSScriptRoot
-if (-not (Test-Path .\.venv\Scripts\python.exe)) {
-    python -m venv .venv
-    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$py312 = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
+if (Test-Path $py312) {
+    $python = $py312
+} else {
+    $python = "python"
 }
 try {
     $ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
@@ -13,4 +15,4 @@ try {
 } catch {
     Write-Host "Al abrir, use la URL Network que imprime Streamlit en el celular."
 }
-.\.venv\Scripts\python.exe -m streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+& $python -m streamlit run app.py --server.address 0.0.0.0 --server.port 8501

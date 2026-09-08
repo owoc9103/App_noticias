@@ -20,17 +20,21 @@ DEFAULT_READER = "hombre"
 READERS = {
     "hombre": {
         "label": "Hombre",
-        "voice": "es-CO-GonzaloNeural",
-        "en_voice": "en-US-GuyNeural",
-        "name": "Gonzalo",
-        "accent": "Cali · Colombia",
+        "voice": "em_alex",
+        "en_voice": "am_michael",
+        "edge_voice": "es-CO-GonzaloNeural",
+        "edge_en": "en-US-GuyNeural",
+        "name": "Alex",
+        "accent": "Kokoro · español",
     },
     "mujer": {
         "label": "Mujer",
-        "voice": "es-CO-SalomeNeural",
-        "en_voice": "en-US-JennyNeural",
-        "name": "Salomé",
-        "accent": "Cali · Colombia",
+        "voice": "ef_dora",
+        "en_voice": "af_heart",
+        "edge_voice": "es-CO-SalomeNeural",
+        "edge_en": "en-US-JennyNeural",
+        "name": "Dora",
+        "accent": "Kokoro · español",
     },
 }
 DEFAULT_VOICE = READERS[DEFAULT_READER]["voice"]

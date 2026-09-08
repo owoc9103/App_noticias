@@ -56,14 +56,12 @@ def run_briefing(
     market_pool = ThreadPoolExecutor(max_workers=1)
     market_job = market_pool.submit(fetch_markets)
     try:
-        note("Recolectando titulares de las fuentes oficiales…")
-        candidates, ok, fail = collect_all(sources, progress=note, use_cache=use_cache)
+        candidates, ok, fail = collect_all(sources, progress=None, use_cache=use_cache)
         for item in candidates:
             score_item(item)
 
         preselected = pick_top(candidates, n=min(12, max(TOP_N * 2, 10)))
-        note("Abriendo las notas para extraer el cuerpo y resumir…")
-        enrich_bodies(preselected, limit=10, progress=note)
+        enrich_bodies(preselected, limit=10, progress=None)
 
         top = pick_top(preselected or candidates, n=TOP_N)
         for item in top:
