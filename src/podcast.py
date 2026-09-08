@@ -117,6 +117,36 @@ def _cues_from_script(script: str, reader_key: str = DEFAULT_READER) -> list[_Cu
     return cues or [_Cue(script, 300, body_rate, body_pitch)]
 
 
+def _pack_cues(cues: list[_Cue]) -> list[_Cue]:
+    """Agrupa frases en bloques de noticiero para pocas llamadas de voz."""
+    if not cues:
+        return cues
+    packs: list[_Cue] = []
+    bucket: list[_Cue] = []
+
+    def flush(pause: int) -> None:
+        if not bucket:
+            return
+        last = bucket[-1]
+        packs.append(_Cue(" ".join(item.text for item in bucket), pause, last.rate, last.pitch))
+        bucket.clear()
+
+    for cue in cues:
+        low = cue.text.lower()
+        new_block = bool(
+            re.match(r"^la (primera|segunda|tercera|cuarta|quinta|sexta|séptima)\b", low)
+            or "cierre de edición" in low
+            or PODCAST_SIGN_OFF.lower() in low
+        )
+        if new_block:
+            flush(520)
+        bucket.append(cue)
+        if PODCAST_SIGN_OFF.lower() in low:
+            flush(180)
+    flush(280)
+    return packs or cues
+
+
 def synthesize(
     script: str,
     voice: str = DEFAULT_VOICE,
@@ -126,16 +156,8 @@ def synthesize(
     stamp = datetime.now(BOGOTA).strftime("%Y%m%d_%H%M%S")
     errors: list[str] = []
 
-    cues = _cues_from_script(script, reader_key)
+    cues = _pack_cues(_cues_from_script(script, reader_key))
     mp3 = AUDIO_DIR / f"briefing_{stamp}.mp3"
-    try:
-        _speak_edge(cues, voice, mp3)
-        if mp3.exists() and mp3.stat().st_size > 500:
-            return mp3
-        errors.append("Microsoft Edge TTS no produjo un archivo válido")
-    except Exception as exc:
-        errors.append(f"Microsoft Edge TTS: {exc}")
-
     try:
         _speak_gtts(cues, mp3)
         if mp3.exists() and mp3.stat().st_size > 500:
@@ -143,6 +165,14 @@ def synthesize(
         errors.append("Google TTS no produjo un archivo válido")
     except Exception as exc:
         errors.append(f"Google TTS: {exc}")
+
+    try:
+        _speak_edge(cues, voice, mp3)
+        if mp3.exists() and mp3.stat().st_size > 500:
+            return mp3
+        errors.append("Microsoft Edge TTS no produjo un archivo válido")
+    except Exception as exc:
+        errors.append(f"Microsoft Edge TTS: {exc}")
 
     wav = AUDIO_DIR / f"briefing_{stamp}.wav"
     try:
@@ -181,8 +211,13 @@ def _run_ffmpeg(args: list[str]) -> None:
     )
 
 
-def _silence_mp3(path: Path, ms: int) -> None:
-    seconds = max(0.12, ms / 1000)
+def _silence_mp3(path: Path, ms: int = 400) -> Path:
+    cached = AUDIO_DIR / f"_silence_{int(ms)}.mp3"
+    if cached.exists() and cached.stat().st_size > 200:
+        if path != cached:
+            path.write_bytes(cached.read_bytes())
+        return cached
+    seconds = max(0.18, ms / 1000)
     _run_ffmpeg(
         [
             "-f",
@@ -193,9 +228,12 @@ def _silence_mp3(path: Path, ms: int) -> None:
             f"{seconds:.2f}",
             "-q:a",
             "6",
-            str(path),
+            str(cached),
         ]
     )
+    if path != cached and cached.exists():
+        path.write_bytes(cached.read_bytes())
+    return cached
 
 
 def _join_mp3(parts: list[Path], dest: Path) -> None:
@@ -262,12 +300,11 @@ async def _speak_edge_async(cues: list[_Cue], voice: str, path: Path) -> None:
                 pitch=cue.pitch,
             )
             await communicate.save(str(clip))
-            _soften_mp3(clip)
             clips.append(clip)
             if cue.pause_ms:
                 hush = folder / f"s{idx:03d}.mp3"
                 try:
-                    _silence_mp3(hush, cue.pause_ms)
+                    _silence_mp3(hush, min(cue.pause_ms, 450))
                     clips.append(hush)
                 except Exception:
                     pass
@@ -275,23 +312,33 @@ async def _speak_edge_async(cues: list[_Cue], voice: str, path: Path) -> None:
 
 
 def _speak_gtts(cues: list[_Cue], path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
     from gtts import gTTS
 
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp)
-        clips: list[Path] = []
-        for idx, cue in enumerate(cues):
+
+        def render(idx_cue: tuple[int, _Cue]) -> Path:
+            idx, cue = idx_cue
             clip = folder / f"c{idx:03d}.mp3"
             gTTS(text=cue.text, lang="es", tld="com.mx").save(str(clip))
-            _soften_mp3(clip)
+            return clip
+
+        with ThreadPoolExecutor(max_workers=min(8, max(2, len(cues)))) as pool:
+            voice_clips = list(pool.map(render, enumerate(cues)))
+
+        hush = folder / "pause.mp3"
+        try:
+            _silence_mp3(hush, 420)
+        except Exception:
+            hush = None
+
+        clips: list[Path] = []
+        for idx, clip in enumerate(voice_clips):
             clips.append(clip)
-            if cue.pause_ms:
-                hush = folder / f"s{idx:03d}.mp3"
-                try:
-                    _silence_mp3(hush, cue.pause_ms)
-                    clips.append(hush)
-                except Exception:
-                    pass
+            if hush and idx < len(voice_clips) - 1:
+                clips.append(hush)
         _join_mp3(clips, path)
 
 

@@ -46,9 +46,9 @@ def run_briefing(
     for item in candidates:
         score_item(item)
 
-    preselected = pick_top(candidates, n=min(18, max(TOP_N * 3, 12)))
+    preselected = pick_top(candidates, n=min(12, max(TOP_N * 2, 10)))
     note("Abriendo las notas para extraer el cuerpo y resumir…")
-    enrich_bodies(preselected, limit=18, progress=note)
+    enrich_bodies(preselected, limit=10, progress=note)
 
     top = pick_top(preselected or candidates, n=TOP_N)
     note("Redactando resúmenes en español…")

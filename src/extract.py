@@ -68,7 +68,7 @@ def extract_from_html(html: str, url: str) -> dict[str, str]:
 def fetch_article(url: str) -> dict[str, str]:
     url = resolve_url(url)
     try:
-        resp = get(url, timeout=12)
+        resp = get(url, timeout=8)
         resp.raise_for_status()
         if "text" not in (resp.headers.get("Content-Type") or ""):
             if not resp.text:
@@ -82,7 +82,7 @@ def resolve_url(url: str) -> str:
     if not url or "news.google.com" not in url:
         return url
     try:
-        resp = get(url, timeout=12, allow_redirects=True)
+        resp = get(url, timeout=8, allow_redirects=True)
         final = resp.url or url
         if "news.google.com" not in final:
             return final

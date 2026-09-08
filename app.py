@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import html
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -89,11 +90,63 @@ def render_item(idx: int, item) -> None:
     st.link_button("Abrir la nota original", item.url, use_container_width=False)
 
 
+def _render_podcast_panel(briefing, reader_key: str) -> None:
+    fragment_kw = {"run_every": timedelta(seconds=1)} if st.session_state.get("audio_job") else {}
+
+    @st.fragment(**fragment_kw)
+    def panel() -> None:
+        current = st.session_state.get("briefing") or briefing
+        st.subheader("Podcast")
+        st.caption(f"Lo lee: {current.reader_label}")
+        if current.audio_note:
+            st.warning(current.audio_note)
+        if current.audio_path and Path(current.audio_path).exists():
+            audio_bytes = Path(current.audio_path).read_bytes()
+            suffix = Path(current.audio_path).suffix.lower()
+            mime = "audio/wav" if suffix == ".wav" else "audio/mp3"
+            st.audio(audio_bytes, format=mime)
+            st.download_button(
+                "Descargar audio",
+                data=audio_bytes,
+                file_name=Path(current.audio_path).name,
+                mime=mime,
+                use_container_width=True,
+            )
+            return
+        if not st.session_state.get("audio_job"):
+            st.caption("Active el podcast o pulse «Volver a narrar con esta voz».")
+            return
+        if not st.session_state.get("tts_armed"):
+            st.session_state.tts_armed = True
+            st.info("Preparando el podcast… ya puede leer el briefing.")
+            return
+        voice, _label, chosen = reader_voice(current.reader_key or reader_key)
+        with st.spinner("Narrando el noticiero…"):
+            try:
+                current.audio_path = str(synthesize(current.script, voice=voice, reader_key=chosen))
+                current.audio_note = (
+                    "Se usó la voz local de Windows porque el servicio en la nube no estuvo disponible."
+                    if current.audio_path.endswith(".wav")
+                    else ""
+                )
+            except Exception as exc:
+                current.audio_note = f"El briefing quedó listo, pero el audio falló: {exc}"
+        st.session_state.briefing = current
+        st.session_state.audio_job = False
+        st.rerun()
+
+    panel()
+
+
 def main() -> None:
     load_css()
     hero()
     if "briefing" not in st.session_state:
         st.session_state.briefing = None
+    if "audio_job" not in st.session_state:
+        st.session_state.audio_job = False
+    if "tts_armed" not in st.session_state:
+        st.session_state.tts_armed = False
 
     with st.sidebar:
         st.header("Edición")
@@ -139,22 +192,14 @@ def main() -> None:
 
     if rerender and st.session_state.briefing:
         briefing = st.session_state.briefing
-        voice, reader_label, reader_key = reader_voice(reader_key)
-        with st.status(f"Narrando de nuevo con voz de {reader_label.lower()}…", expanded=True) as status:
-            try:
-                briefing.audio_path = str(synthesize(briefing.script, voice=voice, reader_key=reader_key))
-                briefing.reader_key = reader_key
-                briefing.reader_label = reader_label
-                briefing.audio_note = (
-                    "Se usó la voz local de Windows porque el servicio en la nube no estuvo disponible."
-                    if briefing.audio_path.endswith(".wav")
-                    else ""
-                )
-                st.session_state.briefing = briefing
-                status.update(label=f"Audio listo · {reader_label}", state="complete")
-            except Exception as exc:
-                status.update(label="No se pudo generar el audio", state="error")
-                st.error(f"Error al narrar: {exc}")
+        _, reader_label, reader_key = reader_voice(reader_key)
+        briefing.audio_path = ""
+        briefing.reader_key = reader_key
+        briefing.reader_label = reader_label
+        briefing.audio_note = ""
+        st.session_state.briefing = briefing
+        st.session_state.audio_job = True
+        st.session_state.tts_armed = False
 
     if run:
         if not chosen:
@@ -169,11 +214,13 @@ def main() -> None:
                 reader_key=reader_key,
                 use_llm=use_llm,
                 use_cache=use_cache,
-                make_audio=make_audio,
+                make_audio=False,
                 progress=progress,
             )
             st.session_state.briefing = briefing
-            status.update(label="Edición lista", state="complete")
+            st.session_state.audio_job = make_audio
+            st.session_state.tts_armed = False
+            status.update(label="Edición lista. El podcast se arma en segundo plano.", state="complete")
         except Exception as exc:
             status.update(label="No se pudo completar la edición", state="error")
             st.error(f"Error al construir el briefing: {exc}")
@@ -207,24 +254,7 @@ def main() -> None:
             """,
             unsafe_allow_html=True,
         )
-        st.subheader("Podcast")
-        st.caption(f"Lo lee: {briefing.reader_label}")
-        if briefing.audio_note:
-            st.warning(briefing.audio_note)
-        if briefing.audio_path and Path(briefing.audio_path).exists():
-            audio_bytes = Path(briefing.audio_path).read_bytes()
-            suffix = Path(briefing.audio_path).suffix.lower()
-            mime = "audio/wav" if suffix == ".wav" else "audio/mp3"
-            st.audio(audio_bytes, format=mime)
-            st.download_button(
-                "Descargar audio",
-                data=audio_bytes,
-                file_name=Path(briefing.audio_path).name,
-                mime=mime,
-                use_container_width=True,
-            )
-        else:
-            st.caption("El audio no se generó en esta corrida. Puede reintentar con «Volver a narrar con esta voz».")
+        _render_podcast_panel(briefing, reader_key)
         with st.expander("Guion del noticiero"):
             st.write(briefing.script)
         st.markdown('<p class="jl-signoff">Esto te lo dice la app de javeriana Cali</p>', unsafe_allow_html=True)

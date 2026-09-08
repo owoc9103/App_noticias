@@ -98,7 +98,7 @@ def _from_entry(source: Source, entry: object, method: str) -> NewsItem | None:
 
 def _from_rss(source: Source, url: str, method: str) -> list[NewsItem]:
     try:
-        resp = get(url, timeout=14)
+        resp = get(url, timeout=8)
         resp.raise_for_status()
         parsed = feedparser.parse(resp.content)
     except Exception:
@@ -120,7 +120,7 @@ def _from_google(source: Source) -> list[NewsItem]:
 
 def _from_home(source: Source) -> list[NewsItem]:
     try:
-        resp = get(source.home, timeout=14)
+        resp = get(source.home, timeout=8)
         resp.raise_for_status()
         pairs = harvest_homepage_links(source.home, resp.text, source.hosts)
     except Exception:

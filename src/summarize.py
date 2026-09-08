@@ -181,6 +181,12 @@ def _clip_sentences(text: str, n: int) -> str:
 
 
 def summarize_many(items: Iterable[NewsItem], use_llm: bool = True) -> list[NewsItem]:
-    for item in items:
-        summarize_item(item, use_llm=use_llm)
-    return list(items)
+    from concurrent.futures import ThreadPoolExecutor
+
+    batch = list(items)
+    if not batch:
+        return batch
+    workers = min(7, len(batch))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(lambda item: summarize_item(item, use_llm=use_llm), batch))
+    return batch
