@@ -1,0 +1,6 @@
+# Extra local (Python 3.10–3.12). Cloud usa requirements.txt.
+-r requirements.txt
+kokoro>=0.9.4
+soundfile>=0.13.0
+espeakng-loader>=0.2.4
+phonemizer-fork>=3.3.0
