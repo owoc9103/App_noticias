@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 CACHE_DIR = DATA_DIR / "cache"
 AUDIO_DIR = DATA_DIR / "audio"
+HISTORY_DIR = DATA_DIR / "history"
 ASSETS_DIR = ROOT / "assets"
 
 PODCAST_SIGN_OFF = "Esto te lo dice la app de javeriana Cali"
@@ -21,17 +22,34 @@ READERS = {
         "label": "Hombre",
         "voice": "es-CO-GonzaloNeural",
         "name": "Gonzalo",
-        "accent": "Colombia",
+        "accent": "Cali · Colombia",
     },
     "mujer": {
         "label": "Mujer",
         "voice": "es-CO-SalomeNeural",
         "name": "Salomé",
-        "accent": "Colombia",
+        "accent": "Cali · Colombia",
     },
 }
 DEFAULT_VOICE = READERS[DEFAULT_READER]["voice"]
 VOICES = {info["voice"]: f'{info["name"]} · {info["accent"]}' for info in READERS.values()}
+
+PROFILES = {
+    "tesoreria": "Tesorería",
+    "inversionista": "Inversionista",
+    "estudiante": "Estudiante",
+}
+DEFAULT_PROFILE = "tesoreria"
+
+IMPACT_LABELS = {
+    "tasas": "Tasas",
+    "dolar": "Dólar",
+    "petroleo": "Petróleo",
+    "fiscal": "Fiscal",
+    "banca": "Banca",
+    "inflacion": "Inflación",
+    "empleo": "Empleo",
+}
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

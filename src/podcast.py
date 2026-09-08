@@ -53,9 +53,9 @@ def build_script(items: list[NewsItem], recommendation: str, now: datetime | Non
     fecha = f"{now.day} de {meses[now.month - 1]} de {now.year}"
 
     parts = [
-        f"{greeting(now)}. Es {fecha}.",
-        "Presentamos el top siete de las noticias económicas más relevantes de Colombia y el mundo, "
-        "preparado por el DATA LAB de la Pontificia Universidad Javeriana Cali.",
+        f"{greeting(now)}. Desde Cali, DATA LAB de la Javeriana.",
+        f"Es {fecha}.",
+        "Presentamos el top siete de las noticias económicas más relevantes de Colombia y el mundo.",
         "El tono es de noticiero. Los resúmenes no reemplazan la nota original.",
     ]
 
@@ -158,21 +158,18 @@ def synthesize(
 
     cues = _pack_cues(_cues_from_script(script, reader_key))
     mp3 = AUDIO_DIR / f"briefing_{stamp}.mp3"
-    try:
-        _speak_gtts(cues, mp3)
-        if mp3.exists() and mp3.stat().st_size > 500:
-            return mp3
-        errors.append("Google TTS no produjo un archivo válido")
-    except Exception as exc:
-        errors.append(f"Google TTS: {exc}")
-
-    try:
-        _speak_edge(cues, voice, mp3)
-        if mp3.exists() and mp3.stat().st_size > 500:
-            return mp3
-        errors.append("Microsoft Edge TTS no produjo un archivo válido")
-    except Exception as exc:
-        errors.append(f"Microsoft Edge TTS: {exc}")
+    engines = (_speak_edge, _speak_gtts) if _edge_reachable() else (_speak_gtts, _speak_edge)
+    for engine in engines:
+        try:
+            if engine is _speak_edge:
+                engine(cues, voice, mp3)
+            else:
+                engine(cues, mp3)
+            if mp3.exists() and mp3.stat().st_size > 500:
+                return mp3
+            errors.append(f"{engine.__name__} no produjo un archivo válido")
+        except Exception as exc:
+            errors.append(f"{engine.__name__}: {exc}")
 
     wav = AUDIO_DIR / f"briefing_{stamp}.wav"
     try:
@@ -188,6 +185,20 @@ def synthesize(
         + " | ".join(errors)
         + ". Revise la red o instale una voz en español en Windows."
     )
+
+
+def _edge_reachable() -> bool:
+    import socket
+
+    previous = socket.getdefaulttimeout()
+    try:
+        socket.setdefaulttimeout(1.2)
+        socket.getaddrinfo("speech.platform.bing.com", 443)
+        return True
+    except OSError:
+        return False
+    finally:
+        socket.setdefaulttimeout(previous)
 
 
 def _ffmpeg() -> str | None:
@@ -322,7 +333,7 @@ def _speak_gtts(cues: list[_Cue], path: Path) -> None:
         def render(idx_cue: tuple[int, _Cue]) -> Path:
             idx, cue = idx_cue
             clip = folder / f"c{idx:03d}.mp3"
-            gTTS(text=cue.text, lang="es", tld="com.mx").save(str(clip))
+            gTTS(text=cue.text, lang="es", tld="com.co").save(str(clip))
             return clip
 
         with ThreadPoolExecutor(max_workers=min(8, max(2, len(cues)))) as pool:

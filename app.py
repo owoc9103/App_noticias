@@ -3,8 +3,9 @@ from __future__ import annotations
 import base64
 import html
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
@@ -20,9 +21,13 @@ load_dotenv(ROOT / ".env")
 
 import streamlit as st
 
-from src.config import ASSETS_DIR, DEFAULT_READER, READERS, SOURCES
+from src.config import ASSETS_DIR, DEFAULT_PROFILE, DEFAULT_READER, IMPACT_LABELS, PROFILES, READERS, SOURCES
+from src.export_pdf import briefing_pdf, briefing_share_text
+from src.history import list_history, load_briefing, load_today, save_briefing
 from src.pipeline import reader_voice, run_briefing
 from src.podcast import synthesize
+
+BOGOTA = ZoneInfo("America/Bogota")
 
 _page = {
     "page_title": "Briefing DATA-LAB | Javeriana Cali",
@@ -36,6 +41,11 @@ CAT_LABEL = {
     "nacional": "Colombia · medios",
     "internacional": "Mundo",
     "oficial": "Fuente oficial",
+}
+QUALITY_LABEL = {
+    "cuerpo": "Cuerpo de la nota",
+    "entradilla": "Solo entradilla pública",
+    "titular": "Solo titular público",
 }
 
 
@@ -72,17 +82,24 @@ def hero() -> None:
 
 def render_item(idx: int, item) -> None:
     when = item.published.strftime("%Y-%m-%d %H:%M") if item.published else "hora no reportada"
+    chips = "".join(
+        f'<span class="jl-chip">{html.escape(IMPACT_LABELS.get(tag, tag))}</span>'
+        for tag in item.tags
+    )
     st.markdown(
         f"""
         <div class="jl-card {item.category}">
           <div class="jl-meta">
             <span class="jl-rank">{idx}</span>
-            <span>{item.source_name}</span>
+            <span>{html.escape(item.source_name)}</span>
             <span>{CAT_LABEL.get(item.category, item.category)}</span>
             <span>{when}</span>
+            <span>{QUALITY_LABEL.get(item.body_quality, item.body_quality)}</span>
           </div>
           <h3>{html.escape(item.title)}</h3>
           <p>{html.escape(item.summary_es)}</p>
+          <p class="jl-why">{html.escape(item.why)}</p>
+          <div class="jl-chips">{chips}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -97,7 +114,7 @@ def _render_podcast_panel(briefing, reader_key: str) -> None:
     def panel() -> None:
         current = st.session_state.get("briefing") or briefing
         st.subheader("Podcast")
-        st.caption(f"Lo lee: {current.reader_label}")
+        st.caption(f"Lo lee: {current.reader_label} · acento caleño / colombiano")
         if current.audio_note:
             st.warning(current.audio_note)
         if current.audio_path and Path(current.audio_path).exists():
@@ -112,6 +129,10 @@ def _render_podcast_panel(briefing, reader_key: str) -> None:
                 mime=mime,
                 use_container_width=True,
             )
+            st.caption("Capítulos")
+            for idx, item in enumerate(current.items, start=1):
+                st.markdown(f"{idx}. {item.source_name}: {item.title}")
+            st.markdown(f"{len(current.items) + 1}. Recomendación financiera")
             return
         if not st.session_state.get("audio_job"):
             st.caption("Active el podcast o pulse «Volver a narrar con esta voz».")
@@ -133,6 +154,10 @@ def _render_podcast_panel(briefing, reader_key: str) -> None:
                 current.audio_note = f"El briefing quedó listo, pero el audio falló: {exc}"
         st.session_state.briefing = current
         st.session_state.audio_job = False
+        try:
+            save_briefing(current)
+        except OSError:
+            pass
         st.rerun()
 
     panel()
@@ -142,7 +167,7 @@ def main() -> None:
     load_css()
     hero()
     if "briefing" not in st.session_state:
-        st.session_state.briefing = None
+        st.session_state.briefing = load_today()
     if "audio_job" not in st.session_state:
         st.session_state.audio_job = False
     if "tts_armed" not in st.session_state:
@@ -150,20 +175,27 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Edición")
-        st.caption("Las fuentes son las páginas oficiales. Si un sitio bloquea el acceso, se usa su canal RSS o Google News filtrado por ese dominio.")
+        st.caption("Si ya hay briefing de hoy, se abre de inmediato. Generar de nuevo actualiza la edición.")
+        profile = st.radio(
+            "Perfil de lectura",
+            options=list(PROFILES),
+            index=list(PROFILES).index(DEFAULT_PROFILE),
+            format_func=lambda key: PROFILES[key],
+            horizontal=True,
+        )
         default_ids = [s.id for s in SOURCES]
-        by_cat = {
-            "Colombia · medios": [s for s in SOURCES if s.category == "nacional"],
-            "Internacionales": [s for s in SOURCES if s.category == "internacional"],
-            "Oficiales de Colombia": [s for s in SOURCES if s.category == "oficial"],
-        }
         chosen: list[str] = []
-        for label, group in by_cat.items():
-            st.subheader(label)
-            for source in group:
-                if st.checkbox(source.name, value=True, key=f"src_{source.id}"):
-                    chosen.append(source.id)
-                st.caption(source.home)
+        with st.expander("Fuentes", expanded=False):
+            by_cat = {
+                "Colombia · medios": [s for s in SOURCES if s.category == "nacional"],
+                "Internacionales": [s for s in SOURCES if s.category == "internacional"],
+                "Oficiales de Colombia": [s for s in SOURCES if s.category == "oficial"],
+            }
+            for label, group in by_cat.items():
+                st.caption(label)
+                for source in group:
+                    if st.checkbox(source.name, value=True, key=f"src_{source.id}"):
+                        chosen.append(source.id)
 
         st.subheader("Quién lee las noticias")
         reader_keys = list(READERS)
@@ -212,6 +244,7 @@ def main() -> None:
             briefing = run_briefing(
                 source_ids=chosen or default_ids,
                 reader_key=reader_key,
+                profile=profile,
                 use_llm=use_llm,
                 use_cache=use_cache,
                 make_audio=False,
@@ -229,18 +262,38 @@ def main() -> None:
     briefing = st.session_state.briefing
     if not briefing:
         st.info(
-            "Pulse **Generar briefing del día** para consultar las fuentes, extraer el top 7, "
-            "resumir cada nota y producir el audio en español."
+            "Pulse **Generar briefing del día** para armar el top 7. "
+            "Si ya se generó hoy, la próxima apertura lo muestra al instante."
         )
         with st.expander("Fuentes que consulta la app"):
             for source in SOURCES:
                 st.markdown(f"- **{source.name}** · [{source.home}]({source.home})")
         return
 
+    st.markdown(
+        "<div class='jl-disclaimer'><strong>Aviso:</strong> esta es una lectura académica de coyuntura "
+        "del DATA-LAB. No es asesoría de inversión personalizada ni una orden de compra o venta.</div>",
+        unsafe_allow_html=True,
+    )
+
+    if briefing.market:
+        cells = "".join(
+            f"<div><span>{html.escape(key)}</span><strong>{html.escape(str(value))}</strong></div>"
+            for key, value in briefing.market.items()
+            if key != "Fuente"
+        )
+        st.markdown(f"<div class='jl-market'>{cells}</div>", unsafe_allow_html=True)
+
+    if briefing.delta_vs_yesterday:
+        with st.expander("Qué cambió vs ayer", expanded=True):
+            for line in briefing.delta_vs_yesterday:
+                st.markdown(f"- {line}")
+
     left, right = st.columns((1.55, 1), gap="large")
     with left:
         st.subheader("Top 7")
-        st.caption(f"{briefing.candidates} titulares evaluados · {briefing.generated_at.strftime('%Y-%m-%d %H:%M')} hora Colombia")
+        when = briefing.generated_at.strftime("%Y-%m-%d %H:%M") if briefing.generated_at else ""
+        st.caption(f"{briefing.candidates} titulares evaluados · {when} hora Colombia · perfil {PROFILES.get(briefing.profile, briefing.profile)}")
         for idx, item in enumerate(briefing.items, start=1):
             render_item(idx, item)
 
@@ -255,8 +308,48 @@ def main() -> None:
             unsafe_allow_html=True,
         )
         _render_podcast_panel(briefing, reader_key)
+        stamp = when.replace(":", "").replace(" ", "_") or "hoy"
+        pdf_key = f"{stamp}_{briefing.profile}_{briefing.candidates}_{len(briefing.items)}"
+        if st.session_state.get("pdf_key") != pdf_key:
+            try:
+                st.session_state.pdf_bytes = briefing_pdf(briefing)
+                st.session_state.pdf_key = pdf_key
+            except Exception:
+                st.session_state.pdf_bytes = None
+                st.session_state.pdf_key = pdf_key
+        if st.session_state.get("pdf_bytes"):
+            st.download_button(
+                "Descargar briefing en PDF",
+                data=st.session_state.pdf_bytes,
+                file_name=f"briefing_datalab_{stamp}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        else:
+            st.caption("El PDF no se pudo armar en este equipo.")
+        st.download_button(
+            "Descargar texto para WhatsApp o correo",
+            data=briefing_share_text(briefing).encode("utf-8"),
+            file_name=f"briefing_datalab_{stamp}.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
         with st.expander("Guion del noticiero"):
             st.write(briefing.script)
+        history_files = list_history()
+        if history_files:
+            with st.expander("Historial"):
+                labels = [path.stem for path in history_files]
+                pick = st.selectbox("Edición guardada", labels, key="history_pick")
+                if st.button("Abrir esta edición", use_container_width=True):
+                    loaded = load_briefing(datetime.strptime(pick, "%Y-%m-%d").replace(tzinfo=BOGOTA))
+                    if loaded:
+                        st.session_state.briefing = loaded
+                        st.session_state.audio_job = False
+                        st.session_state.tts_armed = False
+                        st.rerun()
+                    else:
+                        st.caption("No se pudo abrir esa edición.")
         st.markdown('<p class="jl-signoff">Esto te lo dice la app de javeriana Cali</p>', unsafe_allow_html=True)
         if briefing.sources_ok:
             st.success("Fuentes con titulares: " + ", ".join(briefing.sources_ok))

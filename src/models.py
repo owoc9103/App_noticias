@@ -18,6 +18,10 @@ class NewsItem:
     score: float = 0.0
     language: str = ""
     fetch_method: str = ""
+    tags: list[str] = field(default_factory=list)
+    why: str = ""
+    body_quality: str = "titular"
+    related_sources: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -33,3 +37,6 @@ class Briefing:
     reader_key: str = "hombre"
     reader_label: str = "Hombre"
     audio_note: str = ""
+    profile: str = "tesoreria"
+    market: dict[str, str] = field(default_factory=dict)
+    delta_vs_yesterday: list[str] = field(default_factory=list)

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
-from src.config import COLOMBIA_KEYWORDS, HIGH_KEYWORDS, JUNK_TITLE_BITS, MEDIUM_KEYWORDS, TOP_N
+from src.config import COLOMBIA_KEYWORDS, HIGH_KEYWORDS, IMPACT_LABELS, JUNK_TITLE_BITS, MEDIUM_KEYWORDS, TOP_N
 from src.models import NewsItem
-from src.text_utils import fold
+from src.text_utils import fold, title_key
 
 
 def _hits(text: str, words: tuple[str, ...]) -> int:
@@ -90,13 +91,111 @@ def score_item(item: NewsItem) -> float:
     return item.score
 
 
+_STOP = {
+    "para", "como", "este", "esta", "estos", "esta", "desde", "hasta", "sobre",
+    "tras", "entre", "segun", "según", "despues", "después", "colombia",
+    "colombiano", "colombiana", "mundo", "nueva", "nuevo", "anos", "años",
+}
+
+_TAG_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("inflacion", ("inflacion", "inflación", "ipc", "cpi", "precios")),
+    ("tasas", ("tasa", "tasas", "banrep", "fed", "fomc", "interes", "interés")),
+    ("dolar", ("dolar", "dólar", "trm", "divisas", "peso", "depreci")),
+    ("petroleo", ("petroleo", "petróleo", "brent", "wti", "crudo", "oil", "opep")),
+    ("fiscal", ("presupuesto", "deficit", "déficit", "hacienda", "deuda", "tes", "fiscal")),
+    ("banca", ("banco", "banca", "superfinanciera", "credito", "crédito", "cartera")),
+    ("empleo", ("empleo", "desempleo", "nomina", "nómina", "payroll")),
+)
+
+
+def story_tokens(title: str) -> set[str]:
+    return {
+        word
+        for word in fold(title).replace(".", " ").split()
+        if len(word) > 3 and word not in _STOP
+    }
+
+
+def same_story(left: NewsItem, right: NewsItem) -> bool:
+    a, b = story_tokens(left.title), story_tokens(right.title)
+    if not a or not b:
+        return title_key(left.title) == title_key(right.title)
+    overlap = len(a & b)
+    return overlap >= 3 and overlap / len(a | b) >= 0.42
+
+
+def dedupe_stories(items: list[NewsItem]) -> list[NewsItem]:
+    ranked = sorted(items, key=lambda i: i.score, reverse=True)
+    winners: list[NewsItem] = []
+    for item in ranked:
+        twin = next((other for other in winners if same_story(item, other)), None)
+        if twin:
+            if item.source_name not in twin.related_sources and item.source_name != twin.source_name:
+                twin.related_sources.append(item.source_name)
+            continue
+        winners.append(item)
+    return winners
+
+
+def _has_term(blob: str, word: str) -> bool:
+    if len(word) <= 4:
+        return re.search(rf"\b{re.escape(word)}\b", blob) is not None
+    return word in blob
+
+
+def tag_item(item: NewsItem) -> list[str]:
+    blob = fold(f"{item.title} {item.snippet} {item.summary_es}")
+    tags = [key for key, words in _TAG_RULES if any(_has_term(blob, word) for word in words)]
+    item.tags = tags
+    return tags
+
+
+def body_quality(item: NewsItem) -> str:
+    if len(item.body or "") >= 280:
+        item.body_quality = "cuerpo"
+    elif (item.snippet or "").strip():
+        item.body_quality = "entradilla"
+    else:
+        item.body_quality = "titular"
+    return item.body_quality
+
+
+def why_item(item: NewsItem) -> str:
+    high, mid, col = finance_signal(item)
+    bits: list[str] = []
+    if recency_score(item) >= 0.85:
+        bits.append("última hora")
+    if item.category == "oficial":
+        bits.append(f"fuente oficial ({item.source_name})")
+    if col:
+        bits.append("relevancia Colombia")
+    if high:
+        bits.append("peso económico")
+    if item.tags:
+        bits.append("impacto en " + ", ".join(IMPACT_LABELS.get(tag, tag) for tag in item.tags[:2]))
+    elif mid:
+        bits.append("coyuntura de mercados")
+    if item.related_sources:
+        bits.append("también en " + ", ".join(item.related_sources[:2]))
+    item.why = "Entra al top 7 por " + "; ".join(bits[:3]) + "." if bits else "Entra al top 7 por relevancia de la edición."
+    return item.why
+
+
+def annotate_item(item: NewsItem) -> NewsItem:
+    score_item(item)
+    tag_item(item)
+    body_quality(item)
+    why_item(item)
+    return item
+
+
 def pick_top(items: list[NewsItem], n: int = TOP_N) -> list[NewsItem]:
     usable = [item for item in items if not is_junk(item)]
     relevant = [item for item in usable if is_relevant(item)]
     pool = relevant or usable
     for item in pool:
         score_item(item)
-    ranked = sorted(pool, key=lambda i: (i.score, recency_score(i)), reverse=True)
+    ranked = dedupe_stories(sorted(pool, key=lambda i: (i.score, recency_score(i)), reverse=True))
 
     chosen: list[NewsItem] = []
     per_source: dict[str, int] = {}
