@@ -28,6 +28,11 @@ LLM_SYSTEM = (
     "No copies párrafos literales. No inventes cifras. "
     "Responde solo en español."
 )
+LLM_SYSTEM_EN = (
+    "You are an economic newscast editor. Formal, concise news tone. "
+    "Do not copy paragraphs verbatim. Do not invent figures. "
+    "Reply only in English."
+)
 
 
 def _keyword_score(sentence: str) -> float:
@@ -139,9 +144,63 @@ def _openai_compatible(url: str, key: str, model: str, messages: list[dict[str, 
         return None
 
 
+EN_SOURCE_IDS = {
+    "reuters",
+    "bloomberg",
+    "ft",
+    "wsj",
+    "economist",
+    "cnbc",
+    "marketwatch",
+}
+
+
+def detect_item_language(item: NewsItem) -> str:
+    if item.language in {"en", "es"}:
+        return item.language
+    blob = f"{item.title} {item.snippet} {(item.body or '')[:500]}"
+    if looks_english(blob):
+        return "en"
+    if item.source_id in EN_SOURCE_IDS:
+        sample = f" {fold(blob)[:800]} "
+        es_hits = sum(1 for marker in (" de ", " la ", " el ", " que ", " para ", " con ") if marker in sample)
+        return "es" if es_hits >= 3 else "en"
+    return "es"
+
+
 def summarize_item(item: NewsItem, use_llm: bool = True) -> str:
     raw = " ".join(part for part in (item.snippet, item.body) if part)
     base = extractive_summary(raw, max_sentences=4) or _usable_lead(item)
+    lang = detect_item_language(item)
+    item.language = lang
+
+    if lang == "en":
+        if use_llm:
+            polished = _llm_chat(
+                [
+                    {"role": "system", "content": LLM_SYSTEM_EN},
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Source: {item.source_name}\n"
+                            f"Headline: {item.title}\n"
+                            f"Material: {base[:1800]}\n\n"
+                            "Write a 4-sentence newscast summary. "
+                            "Include the key figure. No opinion."
+                        ),
+                    },
+                ]
+            )
+            if polished:
+                item.summary_es = _clip_sentences(polished, 5)
+                return item.summary_es
+        lead = f"{item.source_name}: {item.title.rstrip('.')}."
+        extra = ""
+        if base and fold(base) not in fold(item.title) and fold(item.title) not in fold(base):
+            extra = base
+        item.summary_es = _clip_sentences(f"{lead} {extra}".strip(), 5)
+        return item.summary_es
+
     base_es = translate_to_es(base)
     title_es = translate_to_es(item.title)
 
@@ -163,7 +222,6 @@ def summarize_item(item: NewsItem, use_llm: bool = True) -> str:
         )
         if polished:
             item.summary_es = _clip_sentences(polished, 5)
-            item.language = "es"
             return item.summary_es
 
     lead = f"Según {item.source_name}, {title_es.rstrip('.')}."
@@ -171,7 +229,6 @@ def summarize_item(item: NewsItem, use_llm: bool = True) -> str:
     if base_es and fold(base_es) not in fold(title_es) and fold(title_es) not in fold(base_es):
         extra = base_es
     item.summary_es = _clip_sentences(f"{lead} {extra}".strip(), 5)
-    item.language = "es"
     return item.summary_es
 
 

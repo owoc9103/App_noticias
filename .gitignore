@@ -1,11 +1,9 @@
-.env
+# Raíz del repo: Banco/
+# La app Streamlit vive en App/
 .venv/
+**/.venv/
 __pycache__/
 *.pyc
-.pytest_cache/
-data/cache/
-data/audio/
-data/history/*.json
-*.mp3
-_probe_feeds.py
-.streamlit/secrets.toml
+.env
+Thumbs.db
+.DS_Store

@@ -19,7 +19,14 @@ except ImportError:
 
 load_dotenv(ROOT / ".env")
 
+import importlib
+
 import streamlit as st
+
+import src.config as _config_mod
+
+if not hasattr(_config_mod, "DEFAULT_PROFILE"):
+    _config_mod = importlib.reload(_config_mod)
 
 from src.config import ASSETS_DIR, DEFAULT_PROFILE, DEFAULT_READER, IMPACT_LABELS, PROFILES, READERS, SOURCES
 from src.export_pdf import briefing_pdf, briefing_share_text
@@ -49,6 +56,28 @@ QUALITY_LABEL = {
 }
 
 
+def lan_url() -> str:
+    import socket
+
+    try:
+        port = int(st.get_option("server.port") or 8501)
+    except Exception:
+        port = 8501
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))
+        ip = sock.getsockname()[0]
+    except OSError:
+        ip = "127.0.0.1"
+    finally:
+        sock.close()
+    return f"http://{ip}:{port}"
+
+
+def audio_mime(path: Path) -> str:
+    return "audio/wav" if path.suffix.lower() == ".wav" else "audio/mpeg"
+
+
 def load_css() -> None:
     css = (ASSETS_DIR / "styles.css").read_text(encoding="utf-8")
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
@@ -69,10 +98,10 @@ def hero() -> None:
               <div>
                 <p class="jl-kicker">DATA LAB · Pontificia Universidad Javeriana Cali</p>
                 <h1>Briefing económico: top 7 noticias</h1>
-                <p>La app consulta las fuentes, resume el cuerpo de cada nota y lo convierte en un podcast en español, con cierre financiero.</p>
+                <p>Más mundo que plaza local. Colombia en español; Reuters, FT o Bloomberg se oyen en inglés. Pensado para el carro.</p>
               </div>
             </div>
-            <div class="jl-badge">Audio siempre en español</div>
+            <div class="jl-badge">Podcast bilingüe</div>
           </div>
         </div>
         """,
@@ -95,6 +124,7 @@ def render_item(idx: int, item) -> None:
             <span>{CAT_LABEL.get(item.category, item.category)}</span>
             <span>{when}</span>
             <span>{QUALITY_LABEL.get(item.body_quality, item.body_quality)}</span>
+            <span>{"EN" if getattr(item, "language", "") == "en" else "ES"}</span>
           </div>
           <h3>{html.escape(item.title)}</h3>
           <p>{html.escape(item.summary_es)}</p>
@@ -113,40 +143,56 @@ def _render_podcast_panel(briefing, reader_key: str) -> None:
     @st.fragment(**fragment_kw)
     def panel() -> None:
         current = st.session_state.get("briefing") or briefing
-        st.subheader("Podcast")
-        st.caption(f"Lo lee: {current.reader_label} · acento caleño / colombiano")
+        st.markdown('<div class="jl-drive">', unsafe_allow_html=True)
+        st.subheader("Escuchar en el carro")
+        st.caption(
+            f"Lo lee: {current.reader_label} · español de Cali e inglés de noticiero. "
+            "Un toque a play; en iPhone, si no suena, descargue el MP3."
+        )
         if current.audio_note:
             st.warning(current.audio_note)
         if current.audio_path and Path(current.audio_path).exists():
-            audio_bytes = Path(current.audio_path).read_bytes()
-            suffix = Path(current.audio_path).suffix.lower()
-            mime = "audio/wav" if suffix == ".wav" else "audio/mp3"
-            st.audio(audio_bytes, format=mime)
+            audio_path = Path(current.audio_path)
+            mime = audio_mime(audio_path)
+            st.audio(str(audio_path.resolve()), format=mime, autoplay=st.session_state.get("drive_mode", False))
             st.download_button(
-                "Descargar audio",
-                data=audio_bytes,
-                file_name=Path(current.audio_path).name,
+                "Descargar MP3 para el celular o el carro",
+                data=audio_path.read_bytes(),
+                file_name=audio_path.with_suffix(".mp3" if mime == "audio/mpeg" else audio_path.suffix).name,
                 mime=mime,
                 use_container_width=True,
             )
-            st.caption("Capítulos")
-            for idx, item in enumerate(current.items, start=1):
-                st.markdown(f"{idx}. {item.source_name}: {item.title}")
-            st.markdown(f"{len(current.items) + 1}. Recomendación financiera")
+            if not st.session_state.get("drive_mode"):
+                st.caption("Capítulos")
+                for idx, item in enumerate(current.items, start=1):
+                    lang = "EN" if item.language == "en" else "ES"
+                    st.markdown(f"{idx}. [{lang}] {item.source_name}: {item.title}")
+                st.markdown(f"{len(current.items) + 1}. Recomendación financiera")
+            st.markdown("</div>", unsafe_allow_html=True)
             return
         if not st.session_state.get("audio_job"):
-            st.caption("Active el podcast o pulse «Volver a narrar con esta voz».")
+            st.caption("Pulse «Volver a narrar» para armar el audio. En el celular, descargue el MP3 y reprodúzcalo con la pantalla bloqueada.")
+            st.markdown("</div>", unsafe_allow_html=True)
             return
         if not st.session_state.get("tts_armed"):
             st.session_state.tts_armed = True
-            st.info("Preparando el podcast… ya puede leer el briefing.")
+            st.info("Preparando el podcast… ya puede manejar; el audio aparece aquí en unos segundos.")
+            st.markdown("</div>", unsafe_allow_html=True)
             return
         voice, _label, chosen = reader_voice(current.reader_key or reader_key)
-        with st.spinner("Narrando el noticiero…"):
+        with st.spinner("Narrando el noticiero bilingüe…"):
             try:
-                current.audio_path = str(synthesize(current.script, voice=voice, reader_key=chosen))
+                current.audio_path = str(
+                    synthesize(
+                        current.script,
+                        voice=voice,
+                        reader_key=chosen,
+                        items=current.items,
+                        recommendation=current.recommendation,
+                    )
+                )
                 current.audio_note = (
-                    "Se usó la voz local de Windows porque el servicio en la nube no estuvo disponible."
+                    "Se usó la voz local de Windows. Si el celular no reproduce WAV, descargue el archivo o vuelva a narrar con red."
                     if current.audio_path.endswith(".wav")
                     else ""
                 )
@@ -172,10 +218,37 @@ def main() -> None:
         st.session_state.audio_job = False
     if "tts_armed" not in st.session_state:
         st.session_state.tts_armed = False
+    if "drive_mode" not in st.session_state:
+        st.session_state.drive_mode = str(st.query_params.get("drive", "")).lower() in {"1", "true", "si"}
+
+    phone = f"{lan_url()}/?drive=1"
+    st.markdown(
+        f"<div class='jl-lan'><strong>En el celular:</strong> misma Wi-Fi y abra "
+        f"<a href='{html.escape(phone)}'>{html.escape(phone)}</a>. "
+        "Si no carga, permita Python en el firewall de Windows. "
+        "Para manejar: Modo al volante → Play o descargue el MP3.</div>",
+        unsafe_allow_html=True,
+    )
+    top_l, top_r = st.columns(2)
+    with top_l:
+        st.toggle(
+            "Modo al volante",
+            key="drive_mode",
+            help="Deja el reproductor arriba, esconde el texto y sirve para oír mientras maneja.",
+        )
+    with top_r:
+        run_main = st.button("Generar / actualizar briefing", type="primary", use_container_width=True, key="run_main")
+    rerender_main = st.button(
+        "Volver a narrar",
+        use_container_width=True,
+        key="rerender_main",
+        disabled=st.session_state.get("briefing") is None,
+    )
 
     with st.sidebar:
         st.header("Edición")
         st.caption("Si ya hay briefing de hoy, se abre de inmediato. Generar de nuevo actualiza la edición.")
+        st.caption(f"URL del celular: {phone}")
         profile = st.radio(
             "Perfil de lectura",
             options=list(PROFILES),
@@ -205,22 +278,26 @@ def main() -> None:
             index=reader_keys.index(DEFAULT_READER),
             format_func=lambda key: READERS[key]["label"],
             horizontal=True,
-            help="Ambas voces son colombianas y mantienen el tono de noticiero en español.",
+            help="Español con acento caleño; las notas en inglés las lee una voz de noticiero en inglés.",
         )
         reader_key = reader_choice
         reader_info = READERS[reader_key]
-        st.caption(f"Voz: {reader_info['name']} · {reader_info['accent']}")
+        st.caption(f"Voz ES: {reader_info['name']} · {reader_info['accent']} · EN: noticiero")
         use_llm = st.toggle("Mejorar redacción con API (Groq u OpenAI)", value=False)
         use_cache = st.toggle("Usar caché de 25 minutos", value=True)
-        make_audio = st.toggle("Generar podcast en español", value=True)
+        make_audio = st.toggle("Generar podcast bilingüe", value=True)
         st.caption("Opcional: cree un archivo .env con GROQ_API_KEY u OPENAI_API_KEY.")
-        run = st.button("Generar briefing del día", type="primary", use_container_width=True)
+        run = st.button("Generar briefing del día", type="primary", use_container_width=True, key="run_sidebar")
         rerender = st.button(
             "Volver a narrar con esta voz",
             use_container_width=True,
+            key="rerender_sidebar",
             disabled=st.session_state.get("briefing") is None,
             help="Repite el audio del briefing actual, sin volver a consultar las fuentes.",
         )
+
+    run = run or run_main
+    rerender = rerender or rerender_main
 
     if rerender and st.session_state.briefing:
         briefing = st.session_state.briefing
@@ -276,6 +353,23 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
+    _render_podcast_panel(briefing, reader_key)
+    when = briefing.generated_at.strftime("%Y-%m-%d %H:%M") if briefing.generated_at else ""
+    drive_mode = st.session_state.get("drive_mode", False)
+
+    if drive_mode:
+        st.markdown(
+            f"""
+            <div class="jl-reco">
+              <h2>Recomendación</h2>
+              <p>{html.escape(briefing.recommendation).replace(chr(10), "<br/>")}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption("Modo al volante: las fichas quedan ocultas. Apáguelo para leer el top 7.")
+        return
+
     if briefing.market:
         cells = "".join(
             f"<div><span>{html.escape(key)}</span><strong>{html.escape(str(value))}</strong></div>"
@@ -291,9 +385,12 @@ def main() -> None:
 
     left, right = st.columns((1.55, 1), gap="large")
     with left:
+        intl = sum(1 for item in briefing.items if item.category == "internacional")
         st.subheader("Top 7")
-        when = briefing.generated_at.strftime("%Y-%m-%d %H:%M") if briefing.generated_at else ""
-        st.caption(f"{briefing.candidates} titulares evaluados · {when} hora Colombia · perfil {PROFILES.get(briefing.profile, briefing.profile)}")
+        st.caption(
+            f"{briefing.candidates} titulares · {intl} internacionales · {when} hora Colombia · "
+            f"perfil {PROFILES.get(briefing.profile, briefing.profile)}"
+        )
         for idx, item in enumerate(briefing.items, start=1):
             render_item(idx, item)
 
@@ -307,7 +404,6 @@ def main() -> None:
             """,
             unsafe_allow_html=True,
         )
-        _render_podcast_panel(briefing, reader_key)
         stamp = when.replace(":", "").replace(" ", "_") or "hoy"
         pdf_key = f"{stamp}_{briefing.profile}_{briefing.candidates}_{len(briefing.items)}"
         if st.session_state.get("pdf_key") != pdf_key:

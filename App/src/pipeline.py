@@ -69,29 +69,37 @@ def run_briefing(
         for item in top:
             annotate_item(item)
 
-        note("Redactando resúmenes en español…")
+        note("Redactando resúmenes en el idioma de cada nota…")
         summarize_many(top, use_llm=use_llm)
         for item in top:
             annotate_item(item)
-
-        note("Elaborando la recomendación financiera…")
-        reco = recommend(top, use_llm=use_llm, profile=profile)
-
-        note("Escribiendo el guion del noticiero…")
-        script = build_script(top, reco)
 
         chosen_voice, reader_label, reader_key = reader_voice(reader_key)
         if voice:
             chosen_voice = voice
 
+        note("Elaborando la recomendación financiera…")
+        reco = recommend(top, use_llm=use_llm, profile=profile)
+
+        note("Escribiendo el guion bilingüe…")
+        script = build_script(top, reco, reader_key=reader_key)
+
         audio_path = ""
         audio_note = ""
         if make_audio:
-            note(f"Generando el podcast en español con voz de {reader_label.lower()}…")
+            note(f"Generando el podcast bilingüe con voz de {reader_label.lower()}…")
             try:
-                audio_path = str(synthesize(script, voice=chosen_voice, reader_key=reader_key))
+                audio_path = str(
+                    synthesize(
+                        script,
+                        voice=chosen_voice,
+                        reader_key=reader_key,
+                        items=top,
+                        recommendation=reco,
+                    )
+                )
                 if audio_path.endswith(".wav"):
-                    audio_note = "Se usó la voz local de Windows porque el servicio en la nube no estuvo disponible."
+                    audio_note = "Se usó la voz local de Windows porque el servicio en la nube no estuvo disponible. En el celular, descargue el audio si el reproductor no abre."
             except Exception as exc:
                 audio_note = f"El briefing se armó, pero el audio no se pudo generar: {exc}"
                 note(audio_note)

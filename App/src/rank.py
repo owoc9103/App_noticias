@@ -72,7 +72,7 @@ def is_relevant(item: NewsItem) -> bool:
             w in fold(item.title) for w in ("comunicado", "junta", "informe", "boletín", "boletin", "ipc", "pib")
         )
     if item.category == "internacional":
-        return high >= 1 or mid >= 2
+        return high >= 1 or mid >= 1
     return high >= 1 or mid >= 1 or col >= 1
 
 
@@ -83,7 +83,7 @@ def score_item(item: NewsItem) -> float:
     high, mid, col = finance_signal(item)
     official = 1.1 if item.category == "oficial" and high + mid > 0 else 0.0
     body_bonus = 0.5 if len(item.body) > 280 else 0.15 if item.snippet else 0.0
-    category_w = {"oficial": 1.12, "nacional": 1.15, "internacional": 1.0}.get(item.category, 1.0)
+    category_w = {"oficial": 1.08, "nacional": 1.06, "internacional": 1.22}.get(item.category, 1.0)
     raw = (3.4 * high) + (1.1 * mid) + (2.0 * col) + official + body_bonus + (2.0 * recency_score(item))
     if not is_relevant(item):
         raw *= 0.15
@@ -165,6 +165,8 @@ def why_item(item: NewsItem) -> str:
     bits: list[str] = []
     if recency_score(item) >= 0.85:
         bits.append("última hora")
+    if item.category == "internacional":
+        bits.append("agenda internacional")
     if item.category == "oficial":
         bits.append(f"fuente oficial ({item.source_name})")
     if col:
@@ -214,7 +216,8 @@ def pick_top(items: list[NewsItem], n: int = TOP_N) -> list[NewsItem]:
         per_source[item.source_id] = per_source.get(item.source_id, 0) + 1
         counts[item.category] = counts.get(item.category, 0) + 1
 
-    quotas = (("oficial", 1), ("nacional", 2), ("internacional", 2))
+    intl_need = 5 if n >= 10 else 4
+    quotas = (("internacional", min(intl_need, n - 2)), ("nacional", 1), ("oficial", 1))
     used: set[str] = set()
     for category, need in quotas:
         for item in ranked:
@@ -227,16 +230,19 @@ def pick_top(items: list[NewsItem], n: int = TOP_N) -> list[NewsItem]:
             if counts[category] >= need:
                 break
 
-    for relax in (False, True):
-        for item in ranked:
-            if len(chosen) >= n:
-                break
-            if id(item) in used:
-                continue
-            if not can_take(item, relax=relax):
-                continue
-            take(item)
-            used.add(id(item))
+    for prefer_intl in (True, False):
+        for relax in (False, True):
+            for item in ranked:
+                if len(chosen) >= n:
+                    break
+                if id(item) in used:
+                    continue
+                if prefer_intl and item.category != "internacional":
+                    continue
+                if not can_take(item, relax=relax):
+                    continue
+                take(item)
+                used.add(id(item))
 
     chosen.sort(key=lambda i: i.score, reverse=True)
     return chosen[:n]

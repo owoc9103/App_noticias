@@ -45,6 +45,7 @@ def save_briefing(briefing: Briefing) -> Path:
                 "why": item.why,
                 "body_quality": item.body_quality,
                 "related_sources": item.related_sources,
+                "language": item.language,
             }
             for item in briefing.items
         ],
@@ -78,6 +79,7 @@ def load_briefing(day: datetime | None = None) -> Briefing | None:
                 why=row.get("why", ""),
                 body_quality=row.get("body_quality", "titular"),
                 related_sources=list(row.get("related_sources") or []),
+                language=row.get("language", ""),
             )
         )
     stamp = raw.get("generated_at")

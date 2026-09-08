@@ -9,8 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from src.config import AUDIO_DIR, DEFAULT_READER, DEFAULT_VOICE, PODCAST_SIGN_OFF
+from src.config import AUDIO_DIR, DEFAULT_READER, DEFAULT_VOICE, PODCAST_SIGN_OFF, READERS
 from src.models import NewsItem
+from src.summarize import detect_item_language
+from src.text_utils import looks_english
 
 BOGOTA = ZoneInfo("America/Bogota")
 ORDINALS = {
@@ -21,6 +23,15 @@ ORDINALS = {
     5: "quinta",
     6: "sexta",
     7: "séptima",
+}
+EN_ORDINALS = {
+    1: "first",
+    2: "second",
+    3: "third",
+    4: "fourth",
+    5: "fifth",
+    6: "sixth",
+    7: "seventh",
 }
 
 
@@ -34,41 +45,18 @@ def greeting(now: datetime | None = None) -> str:
     return "Buenas noches"
 
 
-def build_script(items: list[NewsItem], recommendation: str, now: datetime | None = None) -> str:
-    now = now or datetime.now(BOGOTA)
-    meses = (
-        "enero",
-        "febrero",
-        "marzo",
-        "abril",
-        "mayo",
-        "junio",
-        "julio",
-        "agosto",
-        "septiembre",
-        "octubre",
-        "noviembre",
-        "diciembre",
-    )
-    fecha = f"{now.day} de {meses[now.month - 1]} de {now.year}"
+def item_is_english(item: NewsItem) -> bool:
+    return detect_item_language(item) == "en"
 
-    parts = [
-        f"{greeting(now)}. Desde Cali, DATA LAB de la Javeriana.",
-        f"Es {fecha}.",
-        "Presentamos el top siete de las noticias económicas más relevantes de Colombia y el mundo.",
-        "El tono es de noticiero. Los resúmenes no reemplazan la nota original.",
-    ]
 
-    for idx, item in enumerate(items, start=1):
-        ordinal = ORDINALS.get(idx, f"noticia número {idx}")
-        title = item.title.rstrip(".")
-        summary = (item.summary_es or item.snippet or title).strip()
-        parts.append(f"La {ordinal} noticia. {item.source_name}. {title}. {summary}")
-
-    parts.append("Cierre de edición. Recomendación financiera del día.")
-    parts.append(recommendation)
-    parts.append(PODCAST_SIGN_OFF)
-    script = " ".join(p.strip() for p in parts if p.strip())
+def build_script(
+    items: list[NewsItem],
+    recommendation: str,
+    now: datetime | None = None,
+    reader_key: str = DEFAULT_READER,
+) -> str:
+    cues = build_cues(items, recommendation, now=now, reader_key=reader_key)
+    script = " ".join(cue.text.strip() for cue in cues if cue.text.strip())
     if not script.endswith(PODCAST_SIGN_OFF):
         script = f"{script} {PODCAST_SIGN_OFF}"
     return script
@@ -80,41 +68,115 @@ class _Cue:
     pause_ms: int
     rate: str
     pitch: str
+    lang: str = "es"
+
+
+def _tone(reader_key: str) -> tuple[tuple[str, str], tuple[str, str], tuple[str, str]]:
+    if reader_key == "hombre":
+        return ("-11%", "-3Hz"), ("-16%", "-4Hz"), ("-13%", "-5Hz")
+    return ("-9%", "+1Hz"), ("-14%", "-1Hz"), ("-12%", "-2Hz")
+
+
+def english_voice(reader_key: str) -> str:
+    info = READERS.get(reader_key, READERS[DEFAULT_READER])
+    return str(info.get("en_voice") or "en-US-GuyNeural")
+
+
+def build_cues(
+    items: list[NewsItem],
+    recommendation: str,
+    now: datetime | None = None,
+    reader_key: str = DEFAULT_READER,
+) -> list[_Cue]:
+    now = now or datetime.now(BOGOTA)
+    meses = (
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+    )
+    fecha = f"{now.day} de {meses[now.month - 1]} de {now.year}"
+    body, title, close = _tone(reader_key)
+    cues = [
+        _Cue(f"{greeting(now)}. Desde Cali, DATA LAB de la Javeriana.", 620, *body, "es"),
+        _Cue(f"Es {fecha}.", 700, *body, "es"),
+        _Cue(
+            "Presentamos el top siete. Colombia en español; el mundo, en el idioma original.",
+            780,
+            *body,
+            "es",
+        ),
+    ]
+    for idx, item in enumerate(items, start=1):
+        title_text = item.title.rstrip(".")
+        summary = (item.summary_es or item.snippet or title_text).strip()
+        if item_is_english(item):
+            ordinal = EN_ORDINALS.get(idx, f"number {idx}")
+            cues.append(
+                _Cue(
+                    f"Story {ordinal}. {item.source_name}. {title_text}. {summary}",
+                    380,
+                    *title,
+                    "en",
+                )
+            )
+        else:
+            ordinal = ORDINALS.get(idx, f"noticia número {idx}")
+            cues.append(
+                _Cue(
+                    f"La {ordinal} noticia. {item.source_name}. {title_text}. {summary}",
+                    380,
+                    *title,
+                    "es",
+                )
+            )
+    cues.append(_Cue("Cierre de edición. Recomendación financiera del día.", 900, *title, "es"))
+    if recommendation.strip():
+        reco_lang = "en" if looks_english(recommendation) else "es"
+        cues.append(_Cue(recommendation.strip(), 560, *body, reco_lang))
+    cues.append(_Cue(PODCAST_SIGN_OFF, 250, *close, "es"))
+    return cues
 
 
 def _cues_from_script(script: str, reader_key: str = DEFAULT_READER) -> list[_Cue]:
     """Parte el mismo guion en frases de locución, sin cambiar las palabras."""
-    body_rate, body_pitch = ("-11%", "-3Hz") if reader_key == "hombre" else ("-9%", "+1Hz")
-    title_rate, title_pitch = ("-16%", "-4Hz") if reader_key == "hombre" else ("-14%", "-1Hz")
-    close_rate, close_pitch = ("-13%", "-5Hz") if reader_key == "hombre" else ("-12%", "-2Hz")
-
+    body, title, close = _tone(reader_key)
     sentences = [part.strip() for part in re.split(r"(?<=[\.!?…])\s+", script.strip()) if part.strip()]
     cues: list[_Cue] = []
     for sentence in sentences:
         low = sentence.lower()
         pause = 420
-        rate, pitch = body_rate, body_pitch
+        rate, pitch = body
+        lang = "en" if looks_english(sentence) else "es"
         if low.startswith(("buenos días", "buenas tardes", "buenas noches")):
             pause = 620
+            lang = "es"
         elif low.startswith("es ") and " de " in low:
             pause = 700
+            lang = "es"
         elif "presentamos el top" in low or "data lab" in low:
             pause = 780
+            lang = "es"
         elif re.match(r"^la (primera|segunda|tercera|cuarta|quinta|sexta|séptima|noticia)", low):
             pause = 380
-            rate, pitch = title_rate, title_pitch
+            rate, pitch = title
+            lang = "es"
+        elif re.match(r"^story (first|second|third|fourth|fifth|sixth|seventh|number)", low):
+            pause = 380
+            rate, pitch = title
+            lang = "en"
         elif low.startswith("según "):
             pause = 520
         elif "cierre de edición" in low or "recomendación financiera" in low:
             pause = 900
-            rate, pitch = title_rate, title_pitch
+            rate, pitch = title
+            lang = "es"
         elif PODCAST_SIGN_OFF.lower() in low:
             pause = 250
-            rate, pitch = close_rate, close_pitch
+            rate, pitch = close
+            lang = "es"
         elif len(sentence) > 180:
             pause = 560
-        cues.append(_Cue(sentence, pause, rate, pitch))
-    return cues or [_Cue(script, 300, body_rate, body_pitch)]
+        cues.append(_Cue(sentence, pause, rate, pitch, lang))
+    return cues or [_Cue(script, 300, *body, "es")]
 
 
 def _pack_cues(cues: list[_Cue]) -> list[_Cue]:
@@ -128,15 +190,17 @@ def _pack_cues(cues: list[_Cue]) -> list[_Cue]:
         if not bucket:
             return
         last = bucket[-1]
-        packs.append(_Cue(" ".join(item.text for item in bucket), pause, last.rate, last.pitch))
+        packs.append(_Cue(" ".join(item.text for item in bucket), pause, last.rate, last.pitch, last.lang))
         bucket.clear()
 
     for cue in cues:
         low = cue.text.lower()
         new_block = bool(
             re.match(r"^la (primera|segunda|tercera|cuarta|quinta|sexta|séptima)\b", low)
+            or re.match(r"^story (first|second|third|fourth|fifth|sixth|seventh|number)\b", low)
             or "cierre de edición" in low
             or PODCAST_SIGN_OFF.lower() in low
+            or (bucket and bucket[-1].lang != cue.lang)
         )
         if new_block:
             flush(520)
@@ -147,22 +211,44 @@ def _pack_cues(cues: list[_Cue]) -> list[_Cue]:
     return packs or cues
 
 
+def _ensure_mp3(path: Path) -> Path:
+    if path.suffix.lower() == ".mp3" and path.exists() and path.stat().st_size > 500:
+        return path
+    dest = path.with_suffix(".mp3")
+    if not _ffmpeg() or not path.exists():
+        return path
+    try:
+        _run_ffmpeg(["-i", str(path), "-q:a", "5", str(dest)])
+        if dest.exists() and dest.stat().st_size > 500:
+            return dest
+    except Exception:
+        dest.unlink(missing_ok=True)
+    return path
+
+
 def synthesize(
     script: str,
     voice: str = DEFAULT_VOICE,
     reader_key: str = DEFAULT_READER,
+    items: list[NewsItem] | None = None,
+    recommendation: str | None = None,
 ) -> Path:
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(BOGOTA).strftime("%Y%m%d_%H%M%S")
     errors: list[str] = []
 
-    cues = _pack_cues(_cues_from_script(script, reader_key))
+    raw_cues = (
+        build_cues(items, recommendation or "", reader_key=reader_key)
+        if items
+        else _cues_from_script(script, reader_key)
+    )
+    cues = _pack_cues(raw_cues)
     mp3 = AUDIO_DIR / f"briefing_{stamp}.mp3"
     engines = (_speak_edge, _speak_gtts) if _edge_reachable() else (_speak_gtts, _speak_edge)
     for engine in engines:
         try:
             if engine is _speak_edge:
-                engine(cues, voice, mp3)
+                engine(cues, voice, mp3, reader_key)
             else:
                 engine(cues, mp3)
             if mp3.exists() and mp3.stat().st_size > 500:
@@ -175,7 +261,7 @@ def synthesize(
     try:
         _speak_windows(cues, wav, reader_key)
         if wav.exists() and wav.stat().st_size > 500:
-            return wav
+            return _ensure_mp3(wav)
         errors.append("La voz local de Windows no produjo un archivo válido")
     except Exception as exc:
         errors.append(f"Voz local de Windows: {exc}")
@@ -183,7 +269,7 @@ def synthesize(
     raise RuntimeError(
         "No se pudo generar el podcast. "
         + " | ".join(errors)
-        + ". Revise la red o instale una voz en español en Windows."
+        + ". Revise la red o instale una voz en español o inglés en Windows."
     )
 
 
@@ -292,21 +378,28 @@ def _soften_mp3(path: Path) -> None:
         tmp.unlink(missing_ok=True)
 
 
-def _speak_edge(cues: list[_Cue], voice: str, path: Path) -> None:
-    asyncio.run(_speak_edge_async(cues, voice, path))
+def _speak_edge(cues: list[_Cue], voice: str, path: Path, reader_key: str = DEFAULT_READER) -> None:
+    asyncio.run(_speak_edge_async(cues, voice, path, reader_key))
 
 
-async def _speak_edge_async(cues: list[_Cue], voice: str, path: Path) -> None:
+async def _speak_edge_async(
+    cues: list[_Cue],
+    voice: str,
+    path: Path,
+    reader_key: str = DEFAULT_READER,
+) -> None:
     import edge_tts
 
+    voice_en = english_voice(reader_key)
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp)
         clips: list[Path] = []
         for idx, cue in enumerate(cues):
             clip = folder / f"c{idx:03d}.mp3"
+            chosen = voice_en if cue.lang == "en" else voice
             communicate = edge_tts.Communicate(
                 text=cue.text,
-                voice=voice,
+                voice=chosen,
                 rate=cue.rate,
                 pitch=cue.pitch,
             )
@@ -333,7 +426,10 @@ def _speak_gtts(cues: list[_Cue], path: Path) -> None:
         def render(idx_cue: tuple[int, _Cue]) -> Path:
             idx, cue = idx_cue
             clip = folder / f"c{idx:03d}.mp3"
-            gTTS(text=cue.text, lang="es", tld="com.co").save(str(clip))
+            if cue.lang == "en":
+                gTTS(text=cue.text, lang="en", tld="com").save(str(clip))
+            else:
+                gTTS(text=cue.text, lang="es", tld="com.co").save(str(clip))
             return clip
 
         with ThreadPoolExecutor(max_workers=min(8, max(2, len(cues)))) as pool:

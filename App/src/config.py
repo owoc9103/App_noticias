@@ -21,12 +21,14 @@ READERS = {
     "hombre": {
         "label": "Hombre",
         "voice": "es-CO-GonzaloNeural",
+        "en_voice": "en-US-GuyNeural",
         "name": "Gonzalo",
         "accent": "Cali · Colombia",
     },
     "mujer": {
         "label": "Mujer",
         "voice": "es-CO-SalomeNeural",
+        "en_voice": "en-US-JennyNeural",
         "name": "Salomé",
         "accent": "Cali · Colombia",
     },

@@ -171,3 +171,30 @@ div[data-testid="stSidebar"] h2, div[data-testid="stSidebar"] h3 {
   letter-spacing: 0.02em;
 }
 .stButton > button:hover { background: var(--azul-oscuro); color: #fff; border: 0; }
+
+.jl-drive {
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-top: 5px solid var(--amarillo);
+  padding: 0.85rem 0.95rem 1rem;
+  margin: 0 0 1rem;
+}
+.jl-drive h2, .jl-drive h3 { margin-top: 0; color: var(--azul-oscuro); }
+.jl-lan {
+  background: #eef2f7;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.88rem;
+  margin: 0 0 0.85rem;
+  word-break: break-all;
+}
+
+@media (max-width: 720px) {
+  .block-container { padding-left: 0.7rem !important; padding-right: 0.7rem !important; }
+  .jl-hero-row { flex-direction: column; align-items: flex-start; }
+  .jl-hero h1 { font-size: 1.28rem; }
+  .jl-brand { align-items: flex-start; }
+  .jl-brand img { height: 40px; }
+  .jl-drive { position: sticky; top: 0; z-index: 30; box-shadow: 0 6px 16px rgba(26, 39, 68, 0.12); }
+  .stButton > button { min-height: 3rem; font-size: 1.02rem; }
+  audio { width: 100% !important; min-height: 52px; }
+}

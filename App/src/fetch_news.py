@@ -153,11 +153,16 @@ def _dedupe(items: list[NewsItem]) -> list[NewsItem]:
     return out
 
 
+def _source_cap(source: Source) -> int:
+    return 10 if source.category == "internacional" else MAX_CANDIDATES_PER_SOURCE
+
+
 def collect_source(source: Source, use_cache: bool = True) -> list[NewsItem]:
+    cap = _source_cap(source)
     if use_cache:
         cached = _load_cache(source.id)
         if cached:
-            return cached[:MAX_CANDIDATES_PER_SOURCE]
+            return cached[:cap]
 
     bag: list[NewsItem] = []
     for feed in source.feeds:
@@ -166,7 +171,7 @@ def collect_source(source: Source, use_cache: bool = True) -> list[NewsItem]:
     if len(bag) < 3:
         bag.extend(_from_home(source))
 
-    items = _dedupe(bag)[:MAX_CANDIDATES_PER_SOURCE]
+    items = _dedupe(bag)[:cap]
     if items:
         _save_cache(source.id, items)
     return items
