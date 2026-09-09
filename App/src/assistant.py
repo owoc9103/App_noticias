@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from src.config import ASSETS_DIR, AUDIO_DIR
+from src.groq_client import chat_model, groq_api_key, groq_chat, summary_model
 from src.models import Briefing
 from src.summarize import _llm_chat, _openai_compatible, looks_spanish
 from src.text_utils import fold
@@ -29,7 +30,7 @@ _VOICE = None
 
 
 def llm_available() -> bool:
-    return bool(os.getenv("GROQ_API_KEY", "").strip() or os.getenv("OPENAI_API_KEY", "").strip())
+    return bool(groq_api_key() or os.getenv("OPENAI_API_KEY", "").strip())
 
 
 def takeaways_of(briefing: Briefing) -> list[str]:
@@ -98,28 +99,23 @@ def local_answer(briefing: Briefing, question: str) -> str:
 
 
 def _chat(messages: list[dict[str, str]]) -> str | None:
-    groq = os.getenv("GROQ_API_KEY", "").strip()
-    openai = os.getenv("OPENAI_API_KEY", "").strip()
-    attempts: list[tuple[str, str, str]] = []
-    if groq:
-        chat_model = os.getenv("GROQ_CHAT_MODEL", "llama-3.1-8b-instant")
-        summary_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-        attempts.append(("https://api.groq.com/openai/v1/chat/completions", groq, chat_model))
-        if summary_model != chat_model:
-            attempts.append(("https://api.groq.com/openai/v1/chat/completions", groq, summary_model))
-    if openai:
-        attempts.append(
-            (
-                "https://api.openai.com/v1/chat/completions",
-                openai,
-                os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+    if groq_api_key():
+        for model in (chat_model(), summary_model()):
+            text = groq_chat(
+                messages,
+                model=model,
+                max_tokens=220,
+                temperature=0.2,
+                timeout=22,
             )
-        )
-    for url, key, model in attempts:
+            if text:
+                return text
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if openai_key:
         text = _openai_compatible(
-            url,
-            key,
-            model,
+            "https://api.openai.com/v1/chat/completions",
+            openai_key,
+            os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             messages,
             max_tokens=220,
             temperature=0.2,
@@ -152,7 +148,7 @@ def answer_question(briefing: Briefing, question: str, history: list[dict[str, s
 
 
 def transcribe_audio(data: bytes, mime: str = "audio/wav") -> str | None:
-    groq = os.getenv("GROQ_API_KEY", "").strip()
+    groq = groq_api_key()
     if not groq or not data:
         return None
     import requests

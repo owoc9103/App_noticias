@@ -115,18 +115,28 @@ def _llm_chat(
     temperature: float = 0.3,
     timeout: int = 40,
 ) -> str | None:
-    groq = os.getenv("GROQ_API_KEY", "").strip()
-    openai = os.getenv("OPENAI_API_KEY", "").strip()
-    if groq:
+    from src.groq_client import groq_api_key, groq_chat, summary_model
+
+    if groq_api_key():
+        text = groq_chat(
+            messages,
+            model=model or summary_model(),
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=timeout,
+        )
+        if text:
+            return text
         return _openai_compatible(
             "https://api.groq.com/openai/v1/chat/completions",
-            groq,
-            model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            groq_api_key(),
+            model or summary_model(),
             messages,
             max_tokens=max_tokens,
             temperature=temperature,
             timeout=timeout,
         )
+    openai = os.getenv("OPENAI_API_KEY", "").strip()
     if openai:
         return _openai_compatible(
             "https://api.openai.com/v1/chat/completions",
