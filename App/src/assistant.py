@@ -13,12 +13,15 @@ from src.text_utils import fold
 
 CHAT_SYSTEM = (
     "Eres el asistente de voz de DATA-LAB (Javeriana Cali). "
-    "Estás en una conversación hablada: 2 a 5 frases cortas, naturales, sin markdown, "
-    "sin viñetas y sin URLs. Responde en el idioma de la persona. "
+    "Estás en una conversación hablada: 2 a 5 frases cortas, naturales. "
+    "Nunca uses markdown, asteriscos, guiones de lista, numeración con símbolos, "
+    "viñetas, almohadillas ni URLs. No escribas * ni ** ni - al inicio de línea. "
+    "Si das varias recomendaciones, dilas en prosa oral: "
+    "Primero... Segundo... Y tercero... "
+    "Responde en el idioma de la persona. "
     "Puedes hablar del briefing económico del día SI te pasan ese contexto, "
-    "y también de temas generales (explicar, conversar, aclarar). "
+    "y también de temas generales. "
     "Si la pregunta es de coyuntura y hay briefing, usa esos hechos y no inventes cifras. "
-    "Si la pregunta es general, responde con conocimiento general de forma breve. "
     "No des asesoría de inversión personalizada ni tickers para comprar."
 )
 
@@ -30,6 +33,43 @@ STOP = {
 }
 
 _VOICE = None
+_ORDINALS_ES = ("Primero", "Segundo", "Tercero", "Cuarto", "Quinto", "Sexto", "Séptimo")
+
+
+def speech_clean(text: str) -> str:
+    """Quita markdown y asteriscos para que el TTS no lea 'asterisco'."""
+    raw = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    raw = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", raw)
+    raw = re.sub(r"`+", "", raw)
+    raw = re.sub(r"#{1,6}\s*", "", raw)
+    items: list[str] = []
+    other: list[str] = []
+    for line in raw.split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        listed = re.match(r"^(?:[-*•]|\d+[.)])\s+(.*)$", stripped)
+        if listed:
+            items.append(listed.group(1).strip())
+        else:
+            other.append(stripped)
+    if items and not other:
+        spoken = []
+        for idx, item in enumerate(items):
+            prefix = _ORDINALS_ES[idx] if idx < len(_ORDINALS_ES) else f"Punto {idx + 1}"
+            spoken.append(f"{prefix}, {item.rstrip('.')}.")
+        raw = " ".join(spoken)
+    elif items:
+        raw = " ".join(other + items)
+    else:
+        raw = " ".join(other) if other else raw
+    raw = re.sub(r"\*\*(.+?)\*\*", r"\1", raw)
+    raw = re.sub(r"__(.+?)__", r"\1", raw)
+    raw = re.sub(r"\*(.+?)\*", r"\1", raw)
+    raw = re.sub(r"_([^_\s][^_]*)_", r"\1", raw)
+    raw = raw.replace("*", " ").replace("•", " ").replace("#", " ")
+    raw = re.sub(r"\s+", " ", raw).strip()
+    return raw
 
 
 def looks_like_echo(heard: str, spoken: str) -> bool:
@@ -68,7 +108,7 @@ def briefing_context(briefing: Briefing) -> str:
     lines = [
         f"Briefing DATA-LAB {when}. Perfil {briefing.profile}.",
         "Key takeaways:",
-        *[f"- {point}" for point in takeaways_of(briefing)],
+        *[f"{idx}. {point}" for idx, point in enumerate(takeaways_of(briefing), start=1)],
     ]
     if briefing.market:
         quotes = ", ".join(f"{k}: {v}" for k, v in briefing.market.items() if k != "Fuente")
@@ -149,7 +189,7 @@ def answer_question(briefing: Briefing | None, question: str, history: list[dict
     question = (question or "").strip()
     if not question:
         return "Dígame, lo escucho."
-    fallback = local_answer(briefing, question)
+    fallback = speech_clean(local_answer(briefing, question))
     if not llm_available():
         return fallback
     messages = [{"role": "system", "content": CHAT_SYSTEM}]
@@ -176,7 +216,7 @@ def answer_question(briefing: Briefing | None, question: str, history: list[dict
             messages.append({"role": "assistant", "content": turn["a"]})
     messages.append({"role": "user", "content": question})
     polished = _chat(messages)
-    return polished or fallback
+    return speech_clean(polished or fallback)
 
 
 def transcribe_audio(data: bytes, mime: str = "audio/wav") -> str | None:
