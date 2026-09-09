@@ -163,6 +163,43 @@ h3 {
   line-height: 1.4;
 }
 
+.jl-assistant {
+  margin: 0.4rem 0 1rem;
+  padding: 0.85rem 0.15rem 0.2rem;
+  border-top: 1px solid var(--line);
+}
+
+.jl-assistant h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+  color: #fff;
+}
+
+.jl-qa {
+  margin: 0.7rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.jl-qa .q {
+  margin: 0 0 0.35rem;
+  color: var(--gold);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.jl-qa .a {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.4;
+}
+
+[data-testid="stCustomComponentV1"] iframe {
+  background: #0d1b36 !important;
+}
+
 .jl-empty {
   font-size: 0.95rem;
 }

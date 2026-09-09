@@ -108,35 +108,58 @@ def _chunks(text: str, size: int) -> list[str]:
     return bags
 
 
-def _llm_chat(messages: list[dict[str, str]]) -> str | None:
+def _llm_chat(
+    messages: list[dict[str, str]],
+    model: str | None = None,
+    max_tokens: int | None = None,
+    temperature: float = 0.3,
+    timeout: int = 40,
+) -> str | None:
     groq = os.getenv("GROQ_API_KEY", "").strip()
     openai = os.getenv("OPENAI_API_KEY", "").strip()
     if groq:
         return _openai_compatible(
             "https://api.groq.com/openai/v1/chat/completions",
             groq,
-            os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
             messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=timeout,
         )
     if openai:
         return _openai_compatible(
             "https://api.openai.com/v1/chat/completions",
             openai,
-            os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            model or os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=timeout,
         )
     return None
 
 
-def _openai_compatible(url: str, key: str, model: str, messages: list[dict[str, str]]) -> str | None:
+def _openai_compatible(
+    url: str,
+    key: str,
+    model: str,
+    messages: list[dict[str, str]],
+    max_tokens: int | None = None,
+    temperature: float = 0.3,
+    timeout: int = 40,
+) -> str | None:
     import requests
 
+    payload: dict = {"model": model, "temperature": temperature, "messages": messages}
+    if max_tokens:
+        payload["max_tokens"] = max_tokens
     try:
         resp = requests.post(
             url,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={"model": model, "temperature": 0.3, "messages": messages},
-            timeout=40,
+            json=payload,
+            timeout=timeout,
         )
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"].strip()

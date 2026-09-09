@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #0d1b36;
+        font-family: "Source Sans 3", Segoe UI, sans-serif;
+      }
+      button {
+        width: 100%;
+        height: 48px;
+        border: 0;
+        border-radius: 14px;
+        background: #e4c36a;
+        color: #1a1406;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      button.listening {
+        background: #f3e6b8;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="mic" type="button">Hablar</button>
+    <script>
+      const mic = document.getElementById("mic");
+      const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      function send(type, data) {
+        window.parent.postMessage({ isStreamlitMessage: true, type, ...data }, "*");
+      }
+
+      send("streamlit:componentReady", { apiVersion: 1 });
+      send("streamlit:setFrameHeight", { height: 56 });
+      window.addEventListener("message", (event) => {
+        if (event.data && event.data.type === "streamlit:render") {
+          send("streamlit:setFrameHeight", { height: 56 });
+        }
+      });
+
+      function emit(value) {
+        send("streamlit:setComponentValue", { value });
+      }
+
+      if (!Speech) {
+        mic.textContent = "Voz no disponible";
+        mic.disabled = true;
+      } else {
+        const rec = new Speech();
+        rec.lang = "es-CO";
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+        rec.onstart = () => {
+          mic.classList.add("listening");
+          mic.textContent = "Escuchando…";
+        };
+        rec.onend = () => {
+          mic.classList.remove("listening");
+          mic.textContent = "Hablar";
+        };
+        rec.onerror = () => {
+          mic.classList.remove("listening");
+          mic.textContent = "Hablar";
+        };
+        rec.onresult = (event) => {
+          const text = (event.results[0][0].transcript || "").trim();
+          if (text) emit({ text, ts: Date.now() });
+        };
+        mic.onclick = () => {
+          try {
+            rec.start();
+          } catch (err) {
+            emit({ error: String(err), ts: Date.now() });
+          }
+        };
+      }
+    </script>
+  </body>
+</html>
