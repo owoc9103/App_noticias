@@ -32,6 +32,20 @@ STOP = {
 _VOICE = None
 
 
+def looks_like_echo(heard: str, spoken: str) -> bool:
+    a, b = fold(heard), fold(spoken)
+    if not a or not b:
+        return False
+    if "groq_api_key" in a or "puedo conversar en general" in a:
+        return True
+    if a in b or b in a:
+        return True
+    words_a, words_b = set(a.split()), set(b.split())
+    if len(words_a) >= 4 and len(words_a & words_b) / max(len(words_a), 1) >= 0.55:
+        return True
+    return False
+
+
 def llm_available() -> bool:
     return bool(groq_api_key() or os.getenv("OPENAI_API_KEY", "").strip())
 
@@ -72,10 +86,7 @@ def briefing_context(briefing: Briefing) -> str:
 
 def local_answer(briefing: Briefing | None, question: str) -> str:
     if briefing is None:
-        return (
-            "Puedo conversar en general cuando hay conexión con Groq. "
-            "Mientras tanto, genere el briefing o active GROQ_API_KEY para una respuesta hablada más completa."
-        )
+        return "No pude conectar con el modelo en este momento. Intente de nuevo en unos segundos."
     q = fold(question)
     takes = takeaways_of(briefing)
     if any(word in q for word in ("takeaway", "clave", "resumen", "conclusion", "conclusión", "sintesis", "síntesis")):

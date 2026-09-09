@@ -28,9 +28,10 @@ import src.config as _config_mod
 if not hasattr(_config_mod, "DEFAULT_PROFILE"):
     _config_mod = importlib.reload(_config_mod)
 
-from src.assistant import answer_question, llm_available, synthesize_reply, transcribe_audio, voice_ask
+from src.assistant import answer_question, llm_available, looks_like_echo, transcribe_audio, voice_ask
 from src.config import ASSETS_DIR, DEFAULT_PROFILE, DEFAULT_READER, IMPACT_LABELS, PROFILES, READERS, SOURCES
 from src.export_pdf import briefing_pdf, briefing_share_text
+from src.groq_client import hydrate_streamlit_secrets
 from src.history import list_history, load_briefing, load_today, save_briefing
 from src.pipeline import reader_voice, run_briefing
 from src.podcast import synthesize
@@ -68,6 +69,7 @@ _page = {
 if (ASSETS_DIR / "favicon.svg").exists():
     _page["page_icon"] = str(ASSETS_DIR / "favicon.svg")
 st.set_page_config(**_page)
+hydrate_streamlit_secrets()
 
 
 def lan_url() -> str:
@@ -177,103 +179,66 @@ def run_ask(briefing, question: str, *, speak: bool = True) -> None:
     question = (question or "").strip()
     if not question:
         return
+    if looks_like_echo(question, st.session_state.get("speak_text") or ""):
+        return
     history = list(st.session_state.get("assistant_turns") or [])
-    with st.spinner("Escuché. Respondiendo en voz…"):
+    with st.spinner("Lo escucho…"):
         answer = answer_question(briefing, question, history)
-        audio = synthesize_reply(answer)
     history.append({"q": question, "a": answer})
     st.session_state.assistant_turns = history[-6:]
-    st.session_state.assistant_audio = str(audio) if audio else ""
     st.session_state.speak_text = answer
     st.session_state.speak_id = int(st.session_state.get("speak_id") or 0) + 1
-    st.session_state.assistant_autoplay = bool(speak)
+    st.session_state.voice_status = "speaking"
 
 
 def render_assistant(briefing, drive: bool = False) -> None:
     st.markdown('<section class="jl-assistant">', unsafe_allow_html=True)
     if not drive:
         st.markdown("### Conversar")
-        st.caption(
-            "Háblele a la app: del briefing o de cualquier tema. Ella le responde en voz y sigue escuchando."
-            if llm_available()
-            else "Háblele o escriba. Con GROQ_API_KEY la conversación general y el dictado funcionan mejor."
-        )
-        st.toggle("Conversación continua (escucha de nuevo al terminar)", key="voice_loop")
+        st.caption("Toque el botón, hable y suelte. La app responde en voz, sin historial ni reproductor.")
 
-    loop = bool(st.session_state.get("voice_loop", True))
-
-    if hasattr(st, "audio_input"):
-        clip = st.audio_input(
-            "Micrófono",
-            help="Grabe la pregunta y suelte. Se transcribe y se responde en voz.",
-            key="ask_clip_drive" if drive else "ask_clip",
-        )
-        if clip is not None:
-            payload = clip.getvalue()
-            digest = hashlib.md5(payload).hexdigest()
-            if digest != st.session_state.get("ask_audio_id"):
-                st.session_state.ask_audio_id = digest
-                with st.spinner("Transcribiendo su voz…"):
-                    text = transcribe_audio(payload, getattr(clip, "type", None) or "audio/wav")
-                if text:
-                    run_ask(briefing, text)
-                    st.rerun()
-                else:
-                    st.caption("No se entendió el audio. Use Hablar en Chrome o escriba la pregunta.")
+    loop = True if drive else bool(st.session_state.get("voice_loop", True))
+    if not drive:
+        st.toggle("Seguir escuchando después de responder", key="voice_loop")
 
     spoken = voice_ask(
         key="jl_voice_drive" if drive else "jl_voice",
         reply=st.session_state.get("speak_text") or "",
         speak_id=int(st.session_state.get("speak_id") or 0),
-        loop=loop if not drive else True,
+        loop=loop,
     )
     if isinstance(spoken, dict):
         ts = spoken.get("ts")
-        if ts and ts != st.session_state.get("voice_ts") and spoken.get("text"):
+        heard = str(spoken.get("text") or "").strip()
+        if ts and ts != st.session_state.get("voice_ts") and heard:
             st.session_state.voice_ts = ts
-            run_ask(briefing, str(spoken["text"]))
-            st.rerun()
+            if not looks_like_echo(heard, st.session_state.get("speak_text") or ""):
+                run_ask(briefing, heard)
+                st.rerun()
 
     if not drive:
-        question = st.text_input(
-            "O escriba",
-            placeholder="Del briefing o de lo que quiera hablar…",
-            label_visibility="collapsed",
-            key="ask_q",
-        )
-        if st.button("Preguntar", use_container_width=True, key="ask_btn"):
-            run_ask(briefing, question)
-            st.rerun()
-    else:
-        question = st.text_input(
-            "Pregunta",
-            placeholder="O escriba aquí",
-            label_visibility="collapsed",
-            key="ask_q_drive",
-        )
-        if st.button("Preguntar", use_container_width=True, key="ask_btn_drive"):
-            run_ask(briefing, question)
-            st.rerun()
-
-    turns = list(st.session_state.get("assistant_turns") or [])
-    visible = turns[-1:] if drive else turns[-3:]
-    for turn in visible:
-        st.markdown(
-            f'<div class="jl-qa"><p class="q">{html.escape(turn["q"])}</p>'
-            f'<p class="a">{html.escape(turn["a"])}</p></div>',
-            unsafe_allow_html=True,
-        )
-    audio_path = st.session_state.get("assistant_audio") or ""
-    if audio_path and Path(audio_path).exists():
-        st.caption("Respuesta en audio")
-        autoplay = bool(st.session_state.pop("assistant_autoplay", False))
-        st.audio(audio_path, format="audio/mpeg", autoplay=autoplay)
-        if st.button("▶ Oír respuesta otra vez", use_container_width=True, key="replay_ask_drive" if drive else "replay_ask"):
-            st.session_state.speak_id = int(st.session_state.get("speak_id") or 0) + 1
-            st.session_state.assistant_autoplay = True
-            st.rerun()
-    elif turns:
-        st.caption("No se pudo sintetizar el audio. El texto de la respuesta está arriba.")
+        with st.expander("Escribir en vez de hablar", expanded=False):
+            question = st.text_input(
+                "Mensaje",
+                placeholder="Del briefing o de lo que quiera hablar…",
+                label_visibility="collapsed",
+                key="ask_q",
+            )
+            if st.button("Enviar", use_container_width=True, key="ask_btn"):
+                run_ask(briefing, question)
+                st.rerun()
+            if hasattr(st, "audio_input"):
+                clip = st.audio_input("Grabar audio", key="ask_clip")
+                if clip is not None:
+                    payload = clip.getvalue()
+                    digest = hashlib.md5(payload).hexdigest()
+                    if digest != st.session_state.get("ask_audio_id"):
+                        st.session_state.ask_audio_id = digest
+                        with st.spinner("Transcribiendo…"):
+                            text = transcribe_audio(payload, getattr(clip, "type", None) or "audio/wav")
+                        if text:
+                            run_ask(briefing, text)
+                            st.rerun()
     st.markdown("</section>", unsafe_allow_html=True)
 
 

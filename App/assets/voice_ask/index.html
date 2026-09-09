@@ -12,16 +12,17 @@
       }
       button {
         width: 100%;
-        height: 56px;
+        height: 64px;
         border: 0;
-        border-radius: 16px;
+        border-radius: 18px;
         background: #e4c36a;
         color: #1a1406;
         font-weight: 700;
-        font-size: 1.05rem;
+        font-size: 1.08rem;
         cursor: pointer;
       }
       button.listening { background: #f3e6b8; }
+      button.speaking { background: #c9a84a; }
       button:disabled { opacity: 0.55; cursor: not-allowed; }
     </style>
   </head>
@@ -41,18 +42,31 @@
       function emit(value) {
         send("streamlit:setComponentValue", { value });
       }
+      function stopListen() {
+        try { rec && rec.abort(); } catch (err) {}
+      }
       function speak(text) {
         if (!text || !window.speechSynthesis) return;
         speaking = true;
+        stopListen();
         window.speechSynthesis.cancel();
+        mic.classList.remove("listening");
+        mic.classList.add("speaking");
+        mic.textContent = "Hablando…";
         const u = new SpeechSynthesisUtterance(text);
         u.lang = /[áéíóúñ¿¡]/i.test(text) ? "es-CO" : "en-US";
         u.rate = 1.02;
         u.onend = () => {
           speaking = false;
-          if (loop && rec) setTimeout(startListen, 450);
+          mic.classList.remove("speaking");
+          mic.textContent = "Hablar conmigo";
+          if (loop && rec) setTimeout(startListen, 1600);
         };
-        u.onerror = () => { speaking = false; };
+        u.onerror = () => {
+          speaking = false;
+          mic.classList.remove("speaking");
+          mic.textContent = "Hablar conmigo";
+        };
         window.speechSynthesis.speak(u);
       }
       function startListen() {
@@ -61,12 +75,12 @@
       }
 
       send("streamlit:componentReady", { apiVersion: 1 });
-      send("streamlit:setFrameHeight", { height: 64 });
+      send("streamlit:setFrameHeight", { height: 72 });
 
       window.addEventListener("message", (event) => {
         const data = event.data || {};
         if (data.type !== "streamlit:render") return;
-        send("streamlit:setFrameHeight", { height: 64 });
+        send("streamlit:setFrameHeight", { height: 72 });
         const args = data.args || {};
         loop = args.loop !== false && args.loop !== 0 && args.loop !== "false";
         const reply = args.reply || "";
@@ -78,26 +92,34 @@
       });
 
       if (!Speech) {
-        mic.textContent = "Use el micrófono de abajo";
+        mic.textContent = "Micrófono no disponible en este navegador";
         mic.disabled = true;
       } else {
         rec = new Speech();
         rec.lang = (navigator.language || "es-CO").startsWith("en") ? "en-US" : "es-CO";
         rec.interimResults = false;
         rec.maxAlternatives = 1;
+        rec.continuous = false;
         rec.onstart = () => {
+          if (speaking) {
+            stopListen();
+            return;
+          }
           mic.classList.add("listening");
           mic.textContent = "Lo escucho…";
         };
         rec.onend = () => {
-          mic.classList.remove("listening");
-          mic.textContent = "Hablar conmigo";
+          if (!speaking) {
+            mic.classList.remove("listening");
+            mic.textContent = "Hablar conmigo";
+          }
         };
         rec.onerror = () => {
           mic.classList.remove("listening");
-          mic.textContent = "Hablar conmigo";
+          if (!speaking) mic.textContent = "Hablar conmigo";
         };
         rec.onresult = (event) => {
+          if (speaking) return;
           const text = (event.results[0][0].transcript || "").trim();
           if (text) emit({ text, ts: Date.now() });
         };
