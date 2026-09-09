@@ -20,7 +20,22 @@ def load_api_env() -> None:
 
 def groq_api_key() -> str:
     load_api_env()
-    return os.getenv("GROQ_API_KEY", "").strip()
+    key = os.getenv("GROQ_API_KEY", "").strip()
+    if key:
+        return key
+    try:
+        import streamlit as st
+
+        if "GROQ_API_KEY" in st.secrets:
+            return str(st.secrets["GROQ_API_KEY"]).strip()
+        groq = st.secrets.get("groq")
+        if groq and "api_key" in groq:
+            return str(groq["api_key"]).strip()
+        if groq and "GROQ_API_KEY" in groq:
+            return str(groq["GROQ_API_KEY"]).strip()
+    except Exception:
+        pass
+    return ""
 
 
 def chat_model() -> str:

@@ -12,11 +12,14 @@ from src.summarize import _llm_chat, _openai_compatible, looks_spanish
 from src.text_utils import fold
 
 CHAT_SYSTEM = (
-    "Eres el asistente de voz de DATA-LAB Market Briefing (Javeriana Cali). "
-    "Solo usas el briefing del día que te pasan. Responde en 2 a 4 frases, "
-    "tono de noticiero financiero. Responde en el idioma de la pregunta. "
-    "Si el dato no está en el briefing, dilo y no inventes cifras ni recomendaciones "
-    "de compra o venta. Es lectura académica de coyuntura, no asesoría de inversión."
+    "Eres el asistente de voz de DATA-LAB (Javeriana Cali). "
+    "Estás en una conversación hablada: 2 a 5 frases cortas, naturales, sin markdown, "
+    "sin viñetas y sin URLs. Responde en el idioma de la persona. "
+    "Puedes hablar del briefing económico del día SI te pasan ese contexto, "
+    "y también de temas generales (explicar, conversar, aclarar). "
+    "Si la pregunta es de coyuntura y hay briefing, usa esos hechos y no inventes cifras. "
+    "Si la pregunta es general, responde con conocimiento general de forma breve. "
+    "No des asesoría de inversión personalizada ni tickers para comprar."
 )
 
 STOP = {
@@ -67,7 +70,12 @@ def briefing_context(briefing: Briefing) -> str:
     return "\n".join(lines)
 
 
-def local_answer(briefing: Briefing, question: str) -> str:
+def local_answer(briefing: Briefing | None, question: str) -> str:
+    if briefing is None:
+        return (
+            "Puedo conversar en general cuando hay conexión con Groq. "
+            "Mientras tanto, genere el briefing o active GROQ_API_KEY para una respuesta hablada más completa."
+        )
     q = fold(question)
     takes = takeaways_of(briefing)
     if any(word in q for word in ("takeaway", "clave", "resumen", "conclusion", "conclusión", "sintesis", "síntesis")):
@@ -104,9 +112,9 @@ def _chat(messages: list[dict[str, str]]) -> str | None:
             text = groq_chat(
                 messages,
                 model=model,
-                max_tokens=220,
-                temperature=0.2,
-                timeout=22,
+                max_tokens=320,
+                temperature=0.35,
+                timeout=28,
             )
             if text:
                 return text
@@ -126,18 +134,31 @@ def _chat(messages: list[dict[str, str]]) -> str | None:
     return _llm_chat(messages, max_tokens=220, temperature=0.2, timeout=22)
 
 
-def answer_question(briefing: Briefing, question: str, history: list[dict[str, str]] | None = None) -> str:
+def answer_question(briefing: Briefing | None, question: str, history: list[dict[str, str]] | None = None) -> str:
     question = (question or "").strip()
     if not question:
-        return "¿Sobre qué parte del briefing quiere preguntar?"
+        return "Dígame, lo escucho."
     fallback = local_answer(briefing, question)
     if not llm_available():
         return fallback
-    messages = [
-        {"role": "system", "content": CHAT_SYSTEM},
-        {"role": "user", "content": f"Briefing:\n{briefing_context(briefing)}"},
-    ]
-    for turn in (history or [])[-4:]:
+    messages = [{"role": "system", "content": CHAT_SYSTEM}]
+    if briefing and briefing.items:
+        messages.append(
+            {
+                "role": "user",
+                "content": (
+                    "Contexto opcional del briefing de hoy. Úsalo si la pregunta es de mercados o Colombia; "
+                    f"si es general, ignóralo.\n{briefing_context(briefing)}"
+                ),
+            }
+        )
+        messages.append(
+            {
+                "role": "assistant",
+                "content": "Listo. Puedo hablar del briefing o de lo que quiera, en voz.",
+            }
+        )
+    for turn in (history or [])[-8:]:
         if turn.get("q"):
             messages.append({"role": "user", "content": turn["q"]})
         if turn.get("a"):
@@ -225,13 +246,19 @@ def synthesize_reply(text: str) -> Path | None:
     return dest if dest.exists() and dest.stat().st_size > 400 else None
 
 
-def voice_ask(key: str = "jl_voice"):
+def voice_ask(key: str = "jl_voice", reply: str = "", speak_id: int = 0, loop: bool = True):
     global _VOICE
     import streamlit.components.v1 as components
 
     if _VOICE is None:
         _VOICE = components.declare_component("jl_voice_ask", path=str(ASSETS_DIR / "voice_ask"))
     try:
-        return _VOICE(key=key, default=None)
+        return _VOICE(
+            reply=reply or "",
+            speak_id=int(speak_id or 0),
+            loop=bool(loop),
+            key=key,
+            default=None,
+        )
     except Exception:
         return None

@@ -12,65 +12,90 @@
       }
       button {
         width: 100%;
-        height: 48px;
+        height: 56px;
         border: 0;
-        border-radius: 14px;
+        border-radius: 16px;
         background: #e4c36a;
         color: #1a1406;
         font-weight: 700;
-        font-size: 1rem;
+        font-size: 1.05rem;
         cursor: pointer;
       }
-      button.listening {
-        background: #f3e6b8;
-      }
-      button:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
+      button.listening { background: #f3e6b8; }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
     </style>
   </head>
   <body>
-    <button id="mic" type="button">Hablar</button>
+    <button id="mic" type="button">Hablar conmigo</button>
     <script>
       const mic = document.getElementById("mic");
       const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let lastSpeakId = null;
+      let loop = true;
+      let speaking = false;
+      let rec = null;
 
       function send(type, data) {
         window.parent.postMessage({ isStreamlitMessage: true, type, ...data }, "*");
       }
-
-      send("streamlit:componentReady", { apiVersion: 1 });
-      send("streamlit:setFrameHeight", { height: 56 });
-      window.addEventListener("message", (event) => {
-        if (event.data && event.data.type === "streamlit:render") {
-          send("streamlit:setFrameHeight", { height: 56 });
-        }
-      });
-
       function emit(value) {
         send("streamlit:setComponentValue", { value });
       }
+      function speak(text) {
+        if (!text || !window.speechSynthesis) return;
+        speaking = true;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = /[áéíóúñ¿¡]/i.test(text) ? "es-CO" : "en-US";
+        u.rate = 1.02;
+        u.onend = () => {
+          speaking = false;
+          if (loop && rec) setTimeout(startListen, 450);
+        };
+        u.onerror = () => { speaking = false; };
+        window.speechSynthesis.speak(u);
+      }
+      function startListen() {
+        if (!rec || speaking) return;
+        try { rec.start(); } catch (err) {}
+      }
+
+      send("streamlit:componentReady", { apiVersion: 1 });
+      send("streamlit:setFrameHeight", { height: 64 });
+
+      window.addEventListener("message", (event) => {
+        const data = event.data || {};
+        if (data.type !== "streamlit:render") return;
+        send("streamlit:setFrameHeight", { height: 64 });
+        const args = data.args || {};
+        loop = args.loop !== false && args.loop !== 0 && args.loop !== "false";
+        const reply = args.reply || "";
+        const speakId = args.speak_id;
+        if (reply && speakId != null && String(speakId) !== String(lastSpeakId)) {
+          lastSpeakId = speakId;
+          speak(reply);
+        }
+      });
 
       if (!Speech) {
-        mic.textContent = "Voz no disponible";
+        mic.textContent = "Use el micrófono de abajo";
         mic.disabled = true;
       } else {
-        const rec = new Speech();
-        rec.lang = "es-CO";
+        rec = new Speech();
+        rec.lang = (navigator.language || "es-CO").startsWith("en") ? "en-US" : "es-CO";
         rec.interimResults = false;
         rec.maxAlternatives = 1;
         rec.onstart = () => {
           mic.classList.add("listening");
-          mic.textContent = "Escuchando…";
+          mic.textContent = "Lo escucho…";
         };
         rec.onend = () => {
           mic.classList.remove("listening");
-          mic.textContent = "Hablar";
+          mic.textContent = "Hablar conmigo";
         };
         rec.onerror = () => {
           mic.classList.remove("listening");
-          mic.textContent = "Hablar";
+          mic.textContent = "Hablar conmigo";
         };
         rec.onresult = (event) => {
           const text = (event.results[0][0].transcript || "").trim();
@@ -78,6 +103,8 @@
         };
         mic.onclick = () => {
           try {
+            window.speechSynthesis && window.speechSynthesis.cancel();
+            speaking = false;
             rec.start();
           } catch (err) {
             emit({ error: String(err), ts: Date.now() });
